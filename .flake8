@@ -1,0 +1,9 @@
+[flake8]
+# to be compatible with black
+max-line-length = 88
+select = C,E,F,W,B,B950
+ignore = E203,E501,W503
+
+# useful configs
+exclude = .git,__pycache__,build,dist
+max-complexity = 10
