@@ -1,1 +1,3 @@
-print("python repo basic setup!")
+from tictactoe.tictactoe import game
+
+game()
