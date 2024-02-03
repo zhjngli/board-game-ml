@@ -301,9 +301,12 @@ def trained_game() -> None:
 
     while not g.finished():
         print(f"\n{g.show_board()}\n")
+        curr_digit, next_digit = g.next_digits()
+        print(f"current digit: {curr_digit}")
+        print(f"next digit: {next_digit}")
         r, c = q.choose_action(g.get_state())
         g.place(r, c)
-        print(f"\ncomputer plays at ({r}, {c})!")
+        print(f"\ncomputer plays {curr_digit} at ({r}, {c})!")
 
     print(g.show_board())
     print("game finished!")
