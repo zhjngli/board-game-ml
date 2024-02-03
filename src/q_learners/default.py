@@ -9,7 +9,7 @@ StateType = TypeVar("StateType")
 ActionType = TypeVar("ActionType")
 
 
-def create_float_defaultdict():
+def create_float_defaultdict() -> defaultdict[ActionType, float]:
     return defaultdict(float)
 
 
@@ -21,13 +21,12 @@ class DefaultQLearner(Generic[StateType, ActionType]):
 
     def __init__(self, q_pickle: str = "", alpha=0.1, gamma=0.9, epsilon=0.1) -> None:
         self.q_pickle = q_pickle
+        self.q_table: defaultdict[
+            StateType, defaultdict[ActionType, float]
+        ] = defaultdict(create_float_defaultdict)
         if self.q_pickle and os.path.isfile(self.q_pickle):
             with open(self.q_pickle, "rb") as file:
-                self.q_table: defaultdict[
-                    StateType, defaultdict[ActionType, float]
-                ] = pickle.load(file)
-        else:
-            self.q_table = defaultdict(create_float_defaultdict)
+                self.q_table = pickle.load(file)
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
