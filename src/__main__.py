@@ -1,3 +1,3 @@
-from tictactoe.tictactoe import game
+from tictactoe.tictactoe import trained_game
 
-game()
+trained_game()
