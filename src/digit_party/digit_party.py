@@ -93,10 +93,6 @@ class DigitParty:
         """
         self._check_range(r, c)
         if isinstance(self.board[r][c], Digit):
-            print(self.show_board())
-            a, b = self.next_digits()
-            print(a.val)
-            print(b.val)
             raise ValueError(
                 f"Board already contains tile {self.board[r][c].val} at row {r} column {c}"
             )

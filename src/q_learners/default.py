@@ -23,9 +23,11 @@ class DefaultQLearner(Generic[StateType, ActionType]):
         self.q_pickle = q_pickle
         if self.q_pickle and os.path.isfile(self.q_pickle):
             with open(self.q_pickle, "rb") as file:
-                self.q_table: defaultdict[StateType, defaultdict[ActionType, float]] = pickle.load(file)
+                self.q_table: defaultdict[
+                    StateType, defaultdict[ActionType, float]
+                ] = pickle.load(file)
         else:
-            self.q_table: defaultdict[StateType, defaultdict[ActionType, float]] = defaultdict(create_float_defaultdict)
+            self.q_table = defaultdict(create_float_defaultdict)
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
@@ -38,7 +40,9 @@ class DefaultQLearner(Generic[StateType, ActionType]):
             legal_actions = self.get_actions_from_state(state)
             random_action = random.choice(legal_actions)
             return max(
-                filter(lambda a: a in legal_actions, self.q_table[state]), key=self.q_table[state].get, default=random_action
+                filter(lambda a: a in legal_actions, self.q_table[state]),
+                key=self.q_table[state].__getitem__,
+                default=random_action,
             )
 
     def update_q_value(
@@ -47,7 +51,7 @@ class DefaultQLearner(Generic[StateType, ActionType]):
         random_action = random.choice(self.get_actions_from_state(state))
         best_next_action = max(
             self.q_table[next_state],
-            key=self.q_table[next_state].get,
+            key=self.q_table[next_state].__getitem__,
             default=random_action,
         )
         current_q_value = self.q_table[state][action]
