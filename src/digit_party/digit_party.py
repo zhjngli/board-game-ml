@@ -300,7 +300,7 @@ def trained_game() -> None:
         curr_digit, next_digit = g.next_digits()
         print(f"current digit: {curr_digit}")
         print(f"next digit: {next_digit}")
-        r, c = q.choose_action(g.get_state())
+        r, c = q.choose_action(g.get_state(), exploit=True)
         g.place(r, c)
         print(f"\ncomputer plays {curr_digit} at ({r}, {c})!")
 

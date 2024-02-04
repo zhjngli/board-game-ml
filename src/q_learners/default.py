@@ -31,8 +31,8 @@ class DefaultQLearner(Generic[StateType, ActionType]):
         self.gamma = gamma
         self.epsilon = epsilon
 
-    def choose_action(self, state: StateType) -> ActionType:
-        if random.uniform(0, 1) < self.epsilon:
+    def choose_action(self, state: StateType, exploit: bool = False) -> ActionType:
+        if random.uniform(0, 1) < self.epsilon and not exploit:
             actions = self.get_actions_from_state(state)
             return random.choice(actions)
         else:
@@ -67,7 +67,7 @@ class DefaultQLearner(Generic[StateType, ActionType]):
         pass
 
     def train(self, episodes: int = 1000) -> None:
-        for e in range(episodes):
+        for e in range(1, episodes + 1):
             self.train_once()
 
             if e % 100 == 0:

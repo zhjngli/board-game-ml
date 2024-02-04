@@ -187,7 +187,7 @@ def trained_game() -> None:
             break
 
         print(f"\n\n{g.show()}\n")
-        r, c = q.choose_action(g.get_state())
+        r, c = q.choose_action(g.get_state(), exploit=True)
         g.play(r, c)
         print(f"\ncomputer plays at ({r}, {c})!")
 
