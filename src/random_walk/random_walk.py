@@ -12,6 +12,12 @@ class Action(Enum):
 
 
 class RandomWalk:
+    """
+    A random walk game where the goal is to score some number of points.
+    At the right bound, 1 point is scored, at the left bound, 1 point is lost.
+    It's also possible to just stand there, infinitely accumulating points if applicable.
+    """
+
     def __init__(self, left=-6, right=6, goal=10) -> None:
         self.i = 0
         self.l_bound = left
@@ -47,11 +53,18 @@ class RandomWalk:
 
 
 class RandomWalkQLearner(DefaultQLearner[int, Action]):
+    def default_action_q_values(self) -> dict[Action, float]:
+        actions = {}
+        for a in Action:
+            actions[a] = 0.0
+        return actions
+
     def get_actions_from_state(self, state: int) -> List[Action]:
         return [Action.L, Action.R, Action.N]
 
     def train_once(self) -> None:
         w = RandomWalk()
+        bound_dist = abs(w.r_bound - w.l_bound)
 
         while not w.finished():
             state = w.get_state()
@@ -61,14 +74,17 @@ class RandomWalkQLearner(DefaultQLearner[int, Action]):
 
             new_state = w.get_state()
 
-            if w.at_right():
-                self.update_q_value(state, action, 10, new_state)
-            elif w.at_left():
-                self.update_q_value(state, action, -10, new_state)
-            else:
-                # reward going towards right bound and punish going towards left bound
-                reward = 10 * (new_state - state) * (1 / w.r_bound - 1 / w.l_bound)
-                self.update_q_value(state, action, reward, new_state)
+            # reward minimizing distance to right bound
+            r_dist = abs(w.r_bound - new_state)
+            reward = bound_dist - r_dist
+
+            # punish minimizing distance to left bound
+            l_dist = abs(w.l_bound - new_state)
+            punish = max(0, bound_dist - l_dist)
+
+            # TODO: if the learner is to the left of the left bound (i.e. even more negative),
+            # this actually disincentives it from moving right, but in practice this doesn't really happen.
+            self.update_q_value(state, action, reward - punish, new_state)
 
 
 def trained_game() -> None:

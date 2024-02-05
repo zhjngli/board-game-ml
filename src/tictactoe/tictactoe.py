@@ -123,6 +123,13 @@ def human_game() -> None:
 
 # TODO: this learner is still an idiot
 class TicTacToeQLearner(DefaultQLearner[State, Tuple[int, int]]):
+    def default_action_q_values(self) -> dict[Tuple[int, int], float]:
+        actions = {}
+        for r in range(3):
+            for c in range(3):
+                actions[(r, c)] = 0.0
+        return actions
+
     def get_actions_from_state(self, state: State) -> List[Tuple[int, int]]:
         return [
             (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Tile.N
@@ -131,8 +138,10 @@ class TicTacToeQLearner(DefaultQLearner[State, Tuple[int, int]]):
     # TODO: punish learner for leaving winning spots for its oppponent
     def train_once(self) -> None:
         g = TicTacToe()
+        prev_state = g.get_state()
+        prev_action = (0, 0)
 
-        while True:
+        while not g.finished():
             state = g.get_state()
             action = self.choose_action(state)
 
@@ -140,18 +149,18 @@ class TicTacToeQLearner(DefaultQLearner[State, Tuple[int, int]]):
             g.play(r, c)
 
             if g.win(g.player):
-                reward = 1.0
-                self.update_q_value(state, action, reward, g.get_state())
-                break
+                self.update_q_value(state, action, 1, g.get_state())
+                self.update_q_value(prev_state, prev_action, -1, state)
             elif g.tie():
-                reward = 0.5
-                self.update_q_value(state, action, reward, g.get_state())
-                break
+                self.update_q_value(state, action, 0, g.get_state())
+
+            prev_state = state
+            prev_action = action
 
 
 def trained_game() -> None:
     q = TicTacToeQLearner(q_pickle="src/tictactoe/q.pkl")
-    q.train(episodes=10000)
+    q.train(episodes=100000)
     g = TicTacToe()
 
     player = input("play as player 1 or 2? ").strip()
@@ -160,7 +169,7 @@ def trained_game() -> None:
     elif int(player) == 2:
         print(f"\n{g.show()}\n")
         print("\ncomputer's turn!")
-        r, c = q.choose_action(g.get_state())
+        r, c = q.choose_action(g.get_state(), exploit=True)
         g.play(r, c)
     else:
         print("unrecognized input, defaulting to player 1!")

@@ -68,7 +68,8 @@ class DigitParty:
         if digits:
             if len(digits) < self.n * self.n:
                 raise ValueError(
-                    f"Only {len(digits)} given digits, but board has size {self.n * self.n}"
+                    f"Only {len(digits)} given digits, but board has size"
+                    f" {self.n * self.n}"
                 )
             self.digits = list(map(lambda d: Digit(d), digits))
         else:
@@ -94,7 +95,8 @@ class DigitParty:
         self._check_range(r, c)
         if isinstance(self.board[r][c], Digit):
             raise ValueError(
-                f"Board already contains tile {self.board[r][c].val} at row {r} column {c}"
+                f"Board already contains tile {self.board[r][c].val} at row"
+                f" {r} column {c}"
             )
         d = self.digits.pop()
         self.board[r][c] = d
@@ -243,7 +245,8 @@ def human_game() -> None:
         print(f"next digit: {next_digit}")
         print()
         coord = input(
-            "give me 0-indexed row col coords from the top left to place the current digit (delimit with ','): "
+            "give me 0-indexed row col coords from the top left to place the current"
+            " digit (delimit with ','): "
         ).strip()
         print()
 
@@ -268,6 +271,14 @@ def human_game() -> None:
 
 
 class DigitPartyQLearner(DefaultQLearner[State, Action]):
+    def default_action_q_values(self) -> dict[Action, float]:
+        actions = {}
+        # TODO: dynamic digit party game size based on the game that it's learning
+        for r in range(5):
+            for c in range(5):
+                actions[(r, c)] = 0.0
+        return actions
+
     def get_actions_from_state(self, state: State) -> List[Action]:
         r = len(state.board)
         c = len(state.board[0])
@@ -291,8 +302,9 @@ class DigitPartyQLearner(DefaultQLearner[State, Action]):
 
 
 def trained_game() -> None:
+    # there's too many states in digit party, so naive q learning is inexhaustive and doesn't work well
     q = DigitPartyQLearner(q_pickle="src/digit_party/q.pkl")
-    q.train(episodes=100000)
+    q.train(episodes=1000)
     g = DigitParty()
 
     while not g.finished():

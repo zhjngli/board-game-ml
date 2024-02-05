@@ -9,10 +9,6 @@ StateType = TypeVar("StateType")
 ActionType = TypeVar("ActionType")
 
 
-def create_float_defaultdict() -> defaultdict[ActionType, float]:
-    return defaultdict(float)
-
-
 class DefaultQLearner(Generic[StateType, ActionType]):
     """
     A default Q Learner that uses default dictionaries to track the Q table. Works for simple games.
@@ -21,15 +17,22 @@ class DefaultQLearner(Generic[StateType, ActionType]):
 
     def __init__(self, q_pickle: str = "", alpha=0.1, gamma=0.9, epsilon=0.1) -> None:
         self.q_pickle = q_pickle
-        self.q_table: defaultdict[
-            StateType, defaultdict[ActionType, float]
-        ] = defaultdict(create_float_defaultdict)
+        self.q_table: defaultdict[StateType, dict[ActionType, float]] = defaultdict(
+            self.default_action_q_values
+        )
         if self.q_pickle and os.path.isfile(self.q_pickle):
             with open(self.q_pickle, "rb") as file:
                 self.q_table = pickle.load(file)
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
+
+    @abstractmethod
+    def default_action_q_values(self) -> dict[ActionType, float]:
+        """
+        Gets an enumeration of all actions to a default q-value (probably 0.0). Assumes that the possible actions are always the same at each state.
+        """
+        pass
 
     def choose_action(self, state: StateType, exploit: bool = False) -> ActionType:
         if random.uniform(0, 1) < self.epsilon and not exploit:
@@ -38,11 +41,22 @@ class DefaultQLearner(Generic[StateType, ActionType]):
         else:
             legal_actions = self.get_actions_from_state(state)
             random_action = random.choice(legal_actions)
-            return max(
-                filter(lambda a: a in legal_actions, self.q_table[state]),
-                key=self.q_table[state].__getitem__,
-                default=random_action,
+
+            # max() takes the first item if there are ties, so sometimes we can get stuck in a cycle of always choosing one action
+            max_val = self.q_table[state][
+                max(
+                    self.q_table[state],
+                    key=self.q_table[state].__getitem__,
+                    default=random_action,
+                )
+            ]
+            all_max_actions = list(
+                filter(
+                    lambda a: self.q_table[state][a] == max_val and a in legal_actions,
+                    self.q_table[state],
+                )
             )
+            return random.choice(all_max_actions)
 
     def update_q_value(
         self, state: StateType, action: ActionType, reward: float, next_state: StateType
