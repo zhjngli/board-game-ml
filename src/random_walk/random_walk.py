@@ -64,7 +64,6 @@ class RandomWalkQLearner(DefaultQLearner[int, Action]):
 
     def train_once(self) -> None:
         w = RandomWalk()
-        bound_dist = abs(w.r_bound - w.l_bound)
 
         while not w.finished():
             state = w.get_state()
@@ -75,22 +74,20 @@ class RandomWalkQLearner(DefaultQLearner[int, Action]):
             new_state = w.get_state()
 
             # reward minimizing distance to right bound
-            r_dist = abs(w.r_bound - new_state)
-            reward = bound_dist - r_dist
+            new_r_dist = abs(w.r_bound - new_state)
+            old_r_dist = abs(w.r_bound - state)
+            reward = old_r_dist - new_r_dist
 
-            # punish minimizing distance to left bound
-            l_dist = abs(w.l_bound - new_state)
-            punish = max(0, bound_dist - l_dist)
+            if w.at_right():
+                reward += 1
 
-            # TODO: if the learner is to the left of the left bound (i.e. even more negative),
-            # this actually disincentives it from moving right, but in practice this doesn't really happen.
-            self.update_q_value(state, action, reward - punish, new_state)
+            self.update_q_value(state, action, reward, new_state)
 
 
 def trained_game() -> None:
     pkl_file = "src/random_walk/q.pkl"
     q = RandomWalkQLearner(epsilon=0.5, q_pickle=pkl_file)
-    q.train(episodes=1000)  # TODO: sometimes training gets stuck, unsure why
+    q.train(episodes=1000)
     g = RandomWalk()
 
     while not g.finished():
@@ -105,7 +102,7 @@ def trained_game() -> None:
 
     with open(pkl_file, "rb") as file:
         q_table = pickle.load(file)
-        for i in range(-6, 7):
+        for i in range(g.l_bound, g.r_bound + 1):
             print("state: ", i)
             for a, r in q_table[i].items():
                 print(a, " has reward ", r)
