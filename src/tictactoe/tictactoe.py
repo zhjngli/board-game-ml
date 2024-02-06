@@ -135,7 +135,6 @@ class TicTacToeQLearner(DefaultQLearner[State, Tuple[int, int]]):
             (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Tile.N
         ]
 
-    # TODO: punish learner for leaving winning spots for its oppponent
     def train_once(self) -> None:
         g = TicTacToe()
         prev_state = g.get_state()
@@ -148,7 +147,7 @@ class TicTacToeQLearner(DefaultQLearner[State, Tuple[int, int]]):
             r, c = action
             g.play(r, c)
 
-            if g.win(g.player):
+            if g.win(state.player):
                 self.update_q_value(state, action, 1, g.get_state())
                 self.update_q_value(prev_state, prev_action, -1, state)
             elif g.tie():

@@ -3,7 +3,7 @@ import pickle
 import random
 from abc import abstractmethod
 from collections import defaultdict
-from typing import Generic, List, TypeVar
+from typing import Generic, List, Tuple, TypeVar
 
 StateType = TypeVar("StateType")
 ActionType = TypeVar("ActionType")
@@ -40,23 +40,16 @@ class DefaultQLearner(Generic[StateType, ActionType]):
             return random.choice(actions)
         else:
             legal_actions = self.get_actions_from_state(state)
-            random_action = random.choice(legal_actions)
 
             # max() takes the first item if there are ties, so sometimes we can get stuck in a cycle of always choosing one action
-            max_val = self.q_table[state][
-                max(
-                    self.q_table[state],
-                    key=self.q_table[state].__getitem__,
-                    default=random_action,
-                )
+            actions_q_vals: List[Tuple[ActionType, float]] = [
+                (a, q) for (a, q) in self.q_table[state].items() if a in legal_actions
             ]
-            all_max_actions = list(
-                filter(
-                    lambda a: self.q_table[state][a] == max_val and a in legal_actions,
-                    self.q_table[state],
-                )
-            )
-            return random.choice(all_max_actions)
+            (_, best_q) = max(actions_q_vals, key=lambda x: x[1])
+            best_actions: List[ActionType] = [
+                a for (a, q) in actions_q_vals if q == best_q
+            ]
+            return random.choice(best_actions)
 
     def update_q_value(
         self, state: StateType, action: ActionType, reward: float, next_state: StateType
