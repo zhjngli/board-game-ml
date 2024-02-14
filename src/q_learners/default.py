@@ -1,7 +1,7 @@
 import os
 import pickle
 import random
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Generic, List, Tuple, TypeVar
 
@@ -9,7 +9,7 @@ StateType = TypeVar("StateType")
 ActionType = TypeVar("ActionType")
 
 
-class DefaultQLearner(Generic[StateType, ActionType]):
+class DefaultQLearner(Generic[StateType, ActionType], ABC):
     """
     A default Q Learner that uses default dictionaries to track the Q table. Works for simple games.
     For complex games, we probably need to serialize the states/actions so learning can be more efficient.
@@ -35,12 +35,10 @@ class DefaultQLearner(Generic[StateType, ActionType]):
         pass
 
     def choose_action(self, state: StateType, exploit: bool = False) -> ActionType:
-        if random.uniform(0, 1) < self.epsilon and not exploit:
-            actions = self.get_actions_from_state(state)
-            return random.choice(actions)
+        legal_actions = self.get_actions_from_state(state)
+        if random.uniform(0, 1) > self.epsilon and not exploit:
+            return random.choice(legal_actions)
         else:
-            legal_actions = self.get_actions_from_state(state)
-
             # max() takes the first item if there are ties, so sometimes we can get stuck in a cycle of always choosing one action
             actions_q_vals: List[Tuple[ActionType, float]] = [
                 (a, q) for (a, q) in self.q_table[state].items() if a in legal_actions
@@ -54,14 +52,20 @@ class DefaultQLearner(Generic[StateType, ActionType]):
     def update_q_value(
         self, state: StateType, action: ActionType, reward: float, next_state: StateType
     ) -> None:
-        random_action = random.choice(self.get_actions_from_state(state))
-        best_next_action = max(
-            self.q_table[next_state],
-            key=self.q_table[next_state].__getitem__,
-            default=random_action,
-        )
+        next_actions = self.get_actions_from_state(next_state)
+        if next_actions:
+            random_action = random.choice(self.get_actions_from_state(next_state))
+            best_next_action = max(
+                self.q_table[next_state],
+                key=self.q_table[next_state].__getitem__,
+                default=random_action,
+            )
+            next_q_value = self.q_table[next_state][best_next_action]
+        else:
+            # if next_state is a terminal state (game end), then the best next q value is...?
+            # TODO: does 0.0 work? if so, what does it say about how the reward function should be structured?
+            next_q_value = 0.0
         current_q_value = self.q_table[state][action]
-        next_q_value = self.q_table[next_state][best_next_action]
         self.q_table[state][action] = (
             1 - self.alpha
         ) * current_q_value + self.alpha * (reward + self.gamma * next_q_value)
@@ -73,6 +77,7 @@ class DefaultQLearner(Generic[StateType, ActionType]):
         """
         pass
 
+    # TODO: extract training to a trainer class instead of handling training in this learner class
     def train(self, episodes: int = 1000) -> None:
         for e in range(1, episodes + 1):
             self.train_once()
