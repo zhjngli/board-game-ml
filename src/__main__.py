@@ -1,4 +1,3 @@
-from tictactoe.tictactoe import monte_carlo_many_games, monte_carlo_trained_game
+from random_walk.random_walk import monte_carlo_trained_game
 
-monte_carlo_trained_game(training_episodes=0)
-monte_carlo_many_games()
+monte_carlo_trained_game(training_episodes=10000)
