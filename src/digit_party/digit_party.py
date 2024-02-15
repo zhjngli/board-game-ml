@@ -2,10 +2,11 @@ import random
 from abc import ABC, abstractmethod
 from collections import Counter
 from math import ceil
-from typing import List, NamedTuple, Tuple
+from typing import List, NamedTuple, Tuple, override
 
 from digit_party.data import max_conns
 from learners.q import SimpleQLearner
+from learners.trainer import Trainer
 
 """
 For more information about this game, see the following links:
@@ -82,6 +83,14 @@ class DigitParty:
         else:
             self.digits = [Digit(random.randint(1, self.max_num)) for _ in range(n * n)]
         self.placements: List[Tuple[Tuple[int, int], Digit]] = []
+        self.score = 0
+
+    def reset(self) -> None:
+        self.digits = [
+            Digit(random.randint(1, self.max_num)) for _ in range(self.n * self.n)
+        ]
+        self.board = [[Empty() for _ in range(self.n)] for _ in range(self.n)]
+        self.placements = []
         self.score = 0
 
     def theoretical_max_score(self) -> int:
@@ -278,11 +287,16 @@ def human_game() -> None:
 
 
 class DigitPartyQLearner(SimpleQLearner[State, Action]):
+    def __init__(
+        self, n: int, q_pickle: str = "", alpha=0.1, gamma=0.9, epsilon=0.1
+    ) -> None:
+        super().__init__(q_pickle, alpha, gamma, epsilon)
+        self.n = n
+
     def default_action_q_values(self) -> dict[Action, float]:
         actions = {}
-        # TODO: dynamic digit party game size based on the game that it's learning
-        for r in range(5):
-            for c in range(5):
+        for r in range(self.n):
+            for c in range(self.n):
                 actions[(r, c)] = 0.0
         return actions
 
@@ -293,27 +307,45 @@ class DigitPartyQLearner(SimpleQLearner[State, Action]):
             (i, j) for i in range(r) for j in range(c) if Empty() == state.board[i][j]
         ]
 
-    def train_once(self) -> None:
-        g = DigitParty()
 
-        while not g.finished():
-            curr_score = g.score
-            state = g.get_state()
-            action = self.choose_action(state)
+class DigitPartyQTrainer(DigitParty, Trainer):
+    def __init__(
+        self, player: DigitPartyQLearner, n: int = 5, digits: List[int] | None = None
+    ) -> None:
+        super().__init__(n, digits)
+        self.player = player
+
+    @override
+    def train(self, episodes=10000) -> None:
+        super().train(episodes)
+        self.player.save_policy()
+
+    def train_once(self) -> None:
+        while not self.finished():
+            curr_score = self.score
+            state = self.get_state()
+            action = self.player.choose_action(state)
 
             r, c = action
-            g.place(r, c)
-            new_score = g.score
+            self.place(r, c)
+            new_score = self.score
 
-            self.update_q_value(state, action, new_score - curr_score, g.get_state())
+            self.player.update_q_value(
+                state, action, new_score - curr_score, self.get_state()
+            )
+
+        self.reset()
 
 
-def trained_game() -> None:
-    # TODO: train a simpler version of digit party, like 2x2 or 3x3
+def trained_game(game_size: int) -> None:
     # there's too many states in default digit party, so naive q learning is inexhaustive and doesn't work well
-    q = DigitPartyQLearner(q_pickle="src/digit_party/q.pkl")
-    q.train(episodes=1000)
-    g = DigitParty()
+    # this type of naive training kinda maxes out at a 3x3 game, of around 60-65% of the max score.
+    # for a 2x2 game, the result is trivially 100%
+    q = DigitPartyQLearner(
+        game_size, q_pickle=f"src/digit_party/q-{game_size}x{game_size}.pkl"
+    )
+    g = DigitPartyQTrainer(player=q, n=game_size)
+    g.train(episodes=100000)
 
     while not g.finished():
         print(f"\n{g.show_board()}\n")
@@ -329,3 +361,28 @@ def trained_game() -> None:
     print(f"computer score: {g.score}")
     print(f"theoretical max score: {g.theoretical_max_score()}")
     print(f"% of total: {100 * g.score / g.theoretical_max_score()}")
+
+
+def many_trained_games(game_size: int, games=10000) -> None:
+    q = DigitPartyQLearner(
+        game_size, q_pickle=f"src/digit_party/q-{game_size}x{game_size}.pkl"
+    )
+    g = DigitPartyQTrainer(player=q, n=game_size)
+
+    score = 0
+    theoretical_max = 0
+    for e in range(1, games + 1):
+        while not g.finished():
+            r, c = q.choose_action(g.get_state(), exploit=True)
+            g.place(r, c)
+
+        score += g.score
+        theoretical_max += g.theoretical_max_score()
+        g.reset()
+
+        if e % 100 == 0:
+            print(f"Episode {e}/{games}")
+
+    percent = score / theoretical_max
+    print(f"played {games} games")
+    print(f"achieved {100 * percent}%, or {score}/{theoretical_max}")

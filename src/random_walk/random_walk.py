@@ -1,9 +1,10 @@
 import pickle
 from enum import Enum, auto
-from typing import List
+from typing import List, override
 
 from learners.monte_carlo import MonteCarloLearner
 from learners.q import SimpleQLearner
+from learners.trainer import Trainer
 
 
 class Action(Enum):
@@ -77,33 +78,44 @@ class RandomWalkQLearner(SimpleQLearner[int, Action]):
     def get_actions_from_state(self, state: int) -> List[Action]:
         return [Action.L, Action.R, Action.N]
 
+
+class RandomWalkQTrainer(RandomWalk, Trainer):
+    def __init__(self, player: RandomWalkQLearner, left=-6, right=6, goal=10) -> None:
+        super().__init__(left, right, goal)
+        self.player = player
+
+    @override
+    def train(self, episodes=10000) -> None:
+        super().train(episodes)
+        self.player.save_policy()
+
     def train_once(self) -> None:
-        w = RandomWalk()
+        while not self.finished():
+            state = self.get_state()
 
-        while not w.finished():
-            state = w.get_state()
+            action = self.player.choose_action(state)
+            self.step(action)
 
-            action = self.choose_action(state)
-            w.step(action)
-
-            new_state = w.get_state()
+            new_state = self.get_state()
 
             # reward minimizing distance to right bound
-            new_r_dist = abs(w.r_bound - new_state)
-            old_r_dist = abs(w.r_bound - state)
+            new_r_dist = abs(self.r_bound - new_state)
+            old_r_dist = abs(self.r_bound - state)
             reward = old_r_dist - new_r_dist
 
-            if w.at_right():
+            if self.at_right():
                 reward += 1
 
-            self.update_q_value(state, action, reward, new_state)
+            self.player.update_q_value(state, action, reward, new_state)
+
+        self.reset()
 
 
 def q_trained_game() -> None:
     pkl_file = "src/random_walk/q.pkl"
     q = RandomWalkQLearner(epsilon=0.5, q_pickle=pkl_file)
-    q.train(episodes=1000)
-    g = RandomWalk()
+    g = RandomWalkQTrainer(player=q)
+    g.train()
 
     while not g.finished():
         print(f"\n{g.show()}\n")

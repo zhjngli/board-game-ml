@@ -23,9 +23,9 @@ class SimpleQLearner(Generic[StateType, ActionType], ABC):
         if self.q_pickle and os.path.isfile(self.q_pickle):
             with open(self.q_pickle, "rb") as file:
                 self.q_table = pickle.load(file)
-        self.alpha = alpha
-        self.gamma = gamma
-        self.epsilon = epsilon
+        self.alpha = alpha  # learning rate
+        self.gamma = gamma  # reward decay rate
+        self.epsilon = epsilon  # explore rate
 
     @abstractmethod
     def default_action_q_values(self) -> dict[ActionType, float]:
@@ -34,9 +34,10 @@ class SimpleQLearner(Generic[StateType, ActionType], ABC):
         """
         pass
 
+    # TODO: maybe extract choose_action to a learner or agent class
     def choose_action(self, state: StateType, exploit: bool = False) -> ActionType:
         legal_actions = self.get_actions_from_state(state)
-        if random.uniform(0, 1) > self.epsilon and not exploit:
+        if random.uniform(0, 1) < self.epsilon and not exploit:
             return random.choice(legal_actions)
         else:
             # max() takes the first item if there are ties, so sometimes we can get stuck in a cycle of always choosing one action
@@ -77,21 +78,7 @@ class SimpleQLearner(Generic[StateType, ActionType], ABC):
         """
         pass
 
-    # TODO: extract training to a trainer class instead of handling training in this learner class
-    def train(self, episodes: int = 1000) -> None:
-        for e in range(1, episodes + 1):
-            self.train_once()
-
-            if e % 100 == 0:
-                print(f"Episode {e}/{episodes}")
-
+    def save_policy(self) -> None:
         if self.q_pickle:
             with open(self.q_pickle, "wb") as file:
                 pickle.dump(self.q_table, file)
-
-    @abstractmethod
-    def train_once(self) -> None:
-        """
-        Override this function for the specific game you want to train on!
-        """
-        pass

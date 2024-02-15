@@ -1,7 +1,9 @@
 from enum import Enum, auto
-from typing import List, NamedTuple, Tuple
+from typing import List, NamedTuple, Tuple, override
 
 from learners.monte_carlo import MonteCarloLearner
+from learners.q import SimpleQLearner
+from learners.trainer import Trainer
 
 
 class Tile(Enum):
@@ -20,7 +22,6 @@ class State(NamedTuple):
     player: Tile
 
 
-# TODO: try multi agent q-learning to see if that works better than single agent q-learning
 class TicTacToe:
     def __init__(self) -> None:
         self.reset()
@@ -155,18 +156,15 @@ def human_game() -> None:
     print("game over!")
 
 
-class TicTacToeMonteCarloTrainer(TicTacToe):
+class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
     def __init__(self, p1: MonteCarloLearner, p2: MonteCarloLearner) -> None:
         super().__init__()
         self.p1 = p1
         self.p2 = p2
 
+    @override
     def train(self, episodes=1000) -> None:
-        for e in range(1, episodes + 1):
-            self.train_once()
-
-            if e % 100 == 0:
-                print(f"Episode {e}/{episodes}")
+        super().train(episodes)
 
         self.p1.save_policy()
         self.p2.save_policy()
@@ -218,14 +216,71 @@ class TicTacToeMonteCarloLearner(MonteCarloLearner[State, Tuple[int, int]]):
         return TicTacToe.apply(state, r, c)
 
 
-def computer_play(g: TicTacToe, p: TicTacToeMonteCarloLearner):
+class TicTacToeQTrainer(TicTacToe, Trainer):
+    def __init__(self, p1: SimpleQLearner, p2: SimpleQLearner) -> None:
+        super().__init__()
+        self.p1 = p1
+        self.p2 = p2
+
+    @override
+    def train(self, episodes=10000) -> None:
+        super().train(episodes)
+
+        self.p1.save_policy()
+        self.p2.save_policy()
+
+    # TODO: this training is pretty dumb, doesn't work well
+    def train_once(self) -> None:
+        while not self.finished():
+            state = self.get_state()
+            action = self.p1.choose_action(state)
+            r, c = action
+            self.play1(r, c)
+
+            if self.finished():
+                break
+
+            state = self.get_state()
+            action = self.p2.choose_action(state)
+            r, c = action
+            self.play2(r, c)
+
+        if self.win(Tile.X):
+            self.p1.update_q_value(state, action, 1, self.get_state())
+            self.p2.update_q_value(state, action, -1, self.get_state())
+        elif self.win(Tile.O):
+            self.p1.update_q_value(state, action, -1, self.get_state())
+            self.p2.update_q_value(state, action, 1, self.get_state())
+        elif self.board_filled():
+            self.p1.update_q_value(state, action, -0.1, self.get_state())
+            self.p2.update_q_value(state, action, 0, self.get_state())
+        else:
+            raise Exception("giving rewards when game's not over. something's wrong!")
+        self.reset()
+
+
+class TicTacToeQLearner(SimpleQLearner[State, Tuple[int, int]]):
+    def default_action_q_values(self) -> dict[Tuple[int, int], float]:
+        actions = {}
+        for r in range(3):
+            for c in range(3):
+                actions[(r, c)] = 0.0
+        return actions
+
+    def get_actions_from_state(self, state: State) -> List[Tuple[int, int]]:
+        return [
+            (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Tile.N
+        ]
+
+
+def _computer_play(g: TicTacToe, p: TicTacToeMonteCarloLearner | TicTacToeQLearner):
     print(f"\n{g.show()}\n")
     r, c = p.choose_action(g.get_state(), exploit=True)
     g.play(r, c)
     print(f"\ncomputer plays at ({r}, {c})!")
 
 
-def human_play(g: TicTacToe):
+def _human_play(g: TicTacToe):
     print(f"\n{g.show()}\n")
 
     coord = input("please choose a spot to play: ").strip()
@@ -242,12 +297,11 @@ def human_play(g: TicTacToe):
         raise e
 
 
-def monte_carlo_trained_game(training_episodes=0):  # noqa: C901
-    computer1 = TicTacToeMonteCarloLearner(policy_file="src/tictactoe/p1.pkl")
-    computer2 = TicTacToeMonteCarloLearner(policy_file="src/tictactoe/p2.pkl")
-    g = TicTacToeMonteCarloTrainer(p1=computer1, p2=computer2)
-    g.train(episodes=training_episodes)
-
+def _trained_game(  # noqa: C901
+    g: TicTacToe,
+    computer1: TicTacToeMonteCarloLearner | TicTacToeQLearner,
+    computer2: TicTacToeMonteCarloLearner | TicTacToeQLearner,
+):
     player = input(
         "play as player 1 or 2? or choose 0 to spectate computers play. "
     ).strip()
@@ -260,16 +314,16 @@ def monte_carlo_trained_game(training_episodes=0):  # noqa: C901
     if p == 1:
         pass
     elif p == 2 or p == 0:
-        computer_play(g, computer1)
+        _computer_play(g, computer1)
     else:
         print("unrecognized input, defaulting to player 1!")
 
     while not g.finished():
         if p == 0:
-            computer_play(g, computer2)
+            _computer_play(g, computer2)
         else:
             try:
-                human_play(g)
+                _human_play(g)
             except ValueError as e:
                 print(str(e))
                 continue
@@ -278,7 +332,7 @@ def monte_carlo_trained_game(training_episodes=0):  # noqa: C901
             break
 
         computer = computer1 if p == 0 or p == 2 else computer2
-        computer_play(g, computer)
+        _computer_play(g, computer)
 
     print(f"\n{g.show()}\n")
     print("game over!")
@@ -290,11 +344,12 @@ def monte_carlo_trained_game(training_episodes=0):  # noqa: C901
         print("tie!")
 
 
-def monte_carlo_many_games(games=10000):
-    computer1 = TicTacToeMonteCarloLearner(policy_file="src/tictactoe/p1.pkl")
-    computer2 = TicTacToeMonteCarloLearner(policy_file="src/tictactoe/p2.pkl")
-    g = TicTacToeMonteCarloTrainer(p1=computer1, p2=computer2)
-
+def _many_games(
+    g: TicTacToe,
+    computer1: TicTacToeMonteCarloLearner | TicTacToeQLearner,
+    computer2: TicTacToeMonteCarloLearner | TicTacToeQLearner,
+    games: int,
+):
     x_wins = 0
     o_wins = 0
     ties = 0
@@ -319,3 +374,45 @@ def monte_carlo_many_games(games=10000):
     print(f"x won {x_wins} times")
     print(f"o won {o_wins} times")
     print(f"{ties} ties")
+
+
+MCP1_POLICY = "src/tictactoe/mcp1.pkl"
+MCP2_POLICY = "src/tictactoe/mcp2.pkl"
+
+
+def monte_carlo_trained_game(training_episodes=0):
+    computer1 = TicTacToeMonteCarloLearner(policy_file=MCP1_POLICY)
+    computer2 = TicTacToeMonteCarloLearner(policy_file=MCP2_POLICY)
+    g = TicTacToeMonteCarloTrainer(p1=computer1, p2=computer2)
+    g.train(episodes=training_episodes)
+
+    _trained_game(g, computer1, computer2)
+
+
+def monte_carlo_many_games(games=10000):
+    computer1 = TicTacToeMonteCarloLearner(policy_file=MCP1_POLICY)
+    computer2 = TicTacToeMonteCarloLearner(policy_file=MCP2_POLICY)
+    g = TicTacToeMonteCarloTrainer(p1=computer1, p2=computer2)
+
+    _many_games(g, computer1, computer2, games)
+
+
+QP1_POLICY = "src/tictactoe/qp1.pkl"
+QP2_POLICY = "src/tictactoe/qp2.pkl"
+
+
+def q_trained_game(training_episodes=0):
+    computer1 = TicTacToeQLearner(q_pickle=QP1_POLICY)
+    computer2 = TicTacToeQLearner(q_pickle=QP2_POLICY)
+    g = TicTacToeQTrainer(p1=computer1, p2=computer2)
+    g.train(episodes=training_episodes)
+
+    _trained_game(g, computer1, computer2)
+
+
+def q_many_games(games=10000):
+    computer1 = TicTacToeQLearner(q_pickle=QP1_POLICY)
+    computer2 = TicTacToeQLearner(q_pickle=QP2_POLICY)
+    g = TicTacToeQTrainer(p1=computer1, p2=computer2)
+
+    _many_games(g, computer1, computer2, games)
