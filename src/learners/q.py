@@ -9,7 +9,7 @@ StateType = TypeVar("StateType")
 ActionType = TypeVar("ActionType")
 
 
-class DefaultQLearner(Generic[StateType, ActionType], ABC):
+class SimpleQLearner(Generic[StateType, ActionType], ABC):
     """
     A default Q Learner that uses default dictionaries to track the Q table. Works for simple games.
     For complex games, we probably need to serialize the states/actions so learning can be more efficient.

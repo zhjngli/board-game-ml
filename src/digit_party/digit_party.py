@@ -5,7 +5,14 @@ from math import ceil
 from typing import List, NamedTuple, Tuple
 
 from digit_party.data import max_conns
-from q_learners.default import DefaultQLearner
+from learners.q import SimpleQLearner
+
+"""
+For more information about this game, see the following links:
+https://digit.party/
+https://www.cambridgemathshub.co.uk/post/digit-party-on
+https://fivethirtyeight.com/features/how-much-money-can-you-pull-out-of-a-hat/
+"""
 
 
 class Tile(ABC):
@@ -270,7 +277,7 @@ def human_game() -> None:
     print(f"% of total: {100 * game.score / game.theoretical_max_score()}")
 
 
-class DigitPartyQLearner(DefaultQLearner[State, Action]):
+class DigitPartyQLearner(SimpleQLearner[State, Action]):
     def default_action_q_values(self) -> dict[Action, float]:
         actions = {}
         # TODO: dynamic digit party game size based on the game that it's learning
@@ -302,7 +309,8 @@ class DigitPartyQLearner(DefaultQLearner[State, Action]):
 
 
 def trained_game() -> None:
-    # there's too many states in digit party, so naive q learning is inexhaustive and doesn't work well
+    # TODO: train a simpler version of digit party, like 2x2 or 3x3
+    # there's too many states in default digit party, so naive q learning is inexhaustive and doesn't work well
     q = DigitPartyQLearner(q_pickle="src/digit_party/q.pkl")
     q.train(episodes=1000)
     g = DigitParty()

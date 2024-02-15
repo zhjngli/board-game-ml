@@ -2,8 +2,8 @@ import pickle
 from enum import Enum, auto
 from typing import List
 
-from q_learners.default import DefaultQLearner
-from q_learners.monte_carlo import MonteCarloLearner
+from learners.monte_carlo import MonteCarloLearner
+from learners.q import SimpleQLearner
 
 
 class Action(Enum):
@@ -67,7 +67,7 @@ class RandomWalk:
         return f"random walk at {self.i} with score {self.score}"
 
 
-class RandomWalkQLearner(DefaultQLearner[int, Action]):
+class RandomWalkQLearner(SimpleQLearner[int, Action]):
     def default_action_q_values(self) -> dict[Action, float]:
         actions = {}
         for a in Action:

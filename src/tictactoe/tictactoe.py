@@ -1,7 +1,7 @@
 from enum import Enum, auto
 from typing import List, NamedTuple, Tuple
 
-from q_learners.monte_carlo import MonteCarloLearner
+from learners.monte_carlo import MonteCarloLearner
 
 
 class Tile(Enum):
@@ -20,6 +20,7 @@ class State(NamedTuple):
     player: Tile
 
 
+# TODO: try multi agent q-learning to see if that works better than single agent q-learning
 class TicTacToe:
     def __init__(self) -> None:
         self.reset()
