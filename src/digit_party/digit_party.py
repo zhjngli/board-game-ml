@@ -360,7 +360,7 @@ def trained_game(game_size: int) -> None:
     print("game finished!")
     print(f"computer score: {g.score}")
     print(f"theoretical max score: {g.theoretical_max_score()}")
-    print(f"% of total: {100 * g.score / g.theoretical_max_score()}")
+    print(f"% of total: {100 * g.score / g.theoretical_max_score():.2f}")
 
 
 def many_trained_games(game_size: int, games=10000) -> None:
@@ -371,18 +371,23 @@ def many_trained_games(game_size: int, games=10000) -> None:
 
     score = 0
     theoretical_max = 0
+    percent_per_game = 0.0
     for e in range(1, games + 1):
         while not g.finished():
             r, c = q.choose_action(g.get_state(), exploit=True)
             g.place(r, c)
 
         score += g.score
-        theoretical_max += g.theoretical_max_score()
+        t_max = g.theoretical_max_score()
+        theoretical_max += t_max
+        percent_per_game += g.score / t_max
         g.reset()
 
-        if e % 100 == 0:
+        if e % 1000 == 0:
             print(f"Episode {e}/{games}")
 
     percent = score / theoretical_max
+    average = percent_per_game / games
     print(f"played {games} games")
-    print(f"achieved {100 * percent}%, or {score}/{theoretical_max}")
+    print(f"achieved {100 * percent:.2f}% or {score}/{theoretical_max}")
+    print(f"averaged {100 * average:.2f}% of theoretical max")
