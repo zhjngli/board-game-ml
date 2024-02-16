@@ -17,8 +17,13 @@ class Tile(Enum):
         return f"{self.name}"
 
 
-class State(NamedTuple):
-    board: Tuple  # TODO: better board type
+TTTBoardState = Tuple[
+    Tuple[Tile, Tile, Tile], Tuple[Tile, Tile, Tile], Tuple[Tile, Tile, Tile]
+]
+
+
+class TicTacToeState(NamedTuple):
+    board: TTTBoardState
     player: Tile
 
 
@@ -27,7 +32,7 @@ class TicTacToe:
         self.reset()
 
     def reset(self) -> None:
-        self.board = [[Tile.N for _ in range(3)] for _ in range(3)]
+        self.board: List[List[Tile]] = [[Tile.N for _ in range(3)] for _ in range(3)]
         self.player = Tile.X
 
     def _in_range(self, r: int, c: int) -> bool:
@@ -46,8 +51,18 @@ class TicTacToe:
         self.player = Tile.O if self.player == Tile.X else Tile.X
 
     @staticmethod
-    def apply(state: State, r: int, c: int) -> State:
-        s = State(board=state.board, player=state.player)
+    def get_board_state(board: List[List[Tile]]) -> TTTBoardState:
+        # really ugly way to get correct typing :x
+        # assumes that the board is 3 rows and 3 columns
+        return (
+            (board[0][0], board[0][1], board[0][2]),
+            (board[1][0], board[1][1], board[1][2]),
+            (board[2][0], board[2][1], board[2][2]),
+        )
+
+    @staticmethod
+    def apply(state: TicTacToeState, r: int, c: int) -> TicTacToeState:
+        s = TicTacToeState(board=state.board, player=state.player)
 
         if s.board[r][c] != Tile.N:
             raise ValueError(
@@ -56,15 +71,15 @@ class TicTacToe:
 
         board = list(list(row) for row in s.board)
         board[r][c] = s.player
-        new_s = State(
-            board=tuple(tuple(row) for row in board),
+        new_s = TicTacToeState(
+            board=TicTacToe.get_board_state(board),
             player=Tile.O if s.player == Tile.X else Tile.X,
         )
 
         return new_s
 
     @staticmethod
-    def _is_win(t: Tile, board: List) -> bool:
+    def _is_win(t: Tile, board: List[List[Tile]]) -> bool:
         # fmt: off
         return (
             # horizontal
@@ -85,14 +100,14 @@ class TicTacToe:
         return self._is_win(t, self.board)
 
     @staticmethod
-    def _is_board_filled(board: List) -> bool:
+    def _is_board_filled(board: List[List[Tile]]) -> bool:
         return all(all(t != Tile.N for t in row) for row in board)
 
     def board_filled(self) -> bool:
         return self._is_board_filled(self.board)
 
     @staticmethod
-    def _is_finished(board: List) -> bool:
+    def _is_finished(board: List[List[Tile]]) -> bool:
         xWin = TicTacToe._is_win(Tile.X, board)
         oWin = TicTacToe._is_win(Tile.O, board)
 
@@ -101,8 +116,8 @@ class TicTacToe:
     def finished(self) -> bool:
         return self._is_finished(self.board)
 
-    def get_state(self) -> State:
-        return State(tuple([tuple(row) for row in self.board]), self.player)
+    def get_state(self) -> TicTacToeState:
+        return TicTacToeState(TicTacToe.get_board_state(self.board), self.player)
 
     def play(self, r: int, c: int) -> None:
         self._play(self.player, r, c)
@@ -205,13 +220,13 @@ class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
             raise Exception("giving rewards when game's not over. something's wrong!")
 
 
-class TicTacToeMonteCarloLearner(MonteCarloLearner[State, Tuple[int, int]]):
-    def get_actions_from_state(self, state: State) -> List[Tuple[int, int]]:
+class TicTacToeMonteCarloLearner(MonteCarloLearner[TicTacToeState, Tuple[int, int]]):
+    def get_actions_from_state(self, state: TicTacToeState) -> List[Tuple[int, int]]:
         return [
             (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Tile.N
         ]
 
-    def apply(self, state: State, action: Tuple[int, int]) -> State:
+    def apply(self, state: TicTacToeState, action: Tuple[int, int]) -> TicTacToeState:
         r, c = action
         return TicTacToe.apply(state, r, c)
 
@@ -259,7 +274,7 @@ class TicTacToeQTrainer(TicTacToe, Trainer):
         self.reset()
 
 
-class TicTacToeQLearner(SimpleQLearner[State, Tuple[int, int]]):
+class TicTacToeQLearner(SimpleQLearner[TicTacToeState, Tuple[int, int]]):
     def default_action_q_values(self) -> dict[Tuple[int, int], float]:
         actions = {}
         for r in range(3):
@@ -267,7 +282,7 @@ class TicTacToeQLearner(SimpleQLearner[State, Tuple[int, int]]):
                 actions[(r, c)] = 0.0
         return actions
 
-    def get_actions_from_state(self, state: State) -> List[Tuple[int, int]]:
+    def get_actions_from_state(self, state: TicTacToeState) -> List[Tuple[int, int]]:
         return [
             (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Tile.N
         ]

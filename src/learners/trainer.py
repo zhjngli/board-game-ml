@@ -6,7 +6,7 @@ class Trainer(ABC):
         for e in range(1, episodes + 1):
             self.train_once()
 
-            if e % 100 == 0:
+            if e % 1000 == 0:
                 print(f"Episode {e}/{episodes}")
 
     @abstractmethod
