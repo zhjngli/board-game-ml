@@ -4,6 +4,8 @@ from collections import Counter
 from math import ceil
 from typing import List, NamedTuple, Tuple, override
 
+import matplotlib.pyplot as plt
+
 from digit_party.data import max_conns
 from learners.q import SimpleQLearner
 from learners.trainer import Trainer
@@ -372,6 +374,7 @@ def many_trained_games(game_size: int, games=10000) -> None:
     score = 0
     theoretical_max = 0
     percent_per_game = 0.0
+    percentages = []
     for e in range(1, games + 1):
         while not g.finished():
             r, c = q.choose_action(g.get_state(), exploit=True)
@@ -381,6 +384,7 @@ def many_trained_games(game_size: int, games=10000) -> None:
         t_max = g.theoretical_max_score()
         theoretical_max += t_max
         percent_per_game += g.score / t_max
+        percentages.append(100 * g.score / t_max)
         g.reset()
 
         if e % 1000 == 0:
@@ -391,3 +395,11 @@ def many_trained_games(game_size: int, games=10000) -> None:
     print(f"played {games} games")
     print(f"achieved {100 * percent:.2f}% or {score}/{theoretical_max}")
     print(f"averaged {100 * average:.2f}% of theoretical max")
+
+    plt.hist(percentages, bins=50)
+    plt.xticks(range(0, 101, 2))
+    plt.yticks(range(0, 1000, 25))
+    plt.title("games played per percent score")
+    plt.xlabel("percent score")
+    plt.ylabel("number of games")
+    plt.show()
