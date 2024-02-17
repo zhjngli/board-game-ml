@@ -37,6 +37,15 @@ class UltimateTicTacToe:
         self.active_nonant: Section | None = None
 
     @staticmethod
+    def _in_range(sl: Section | Location) -> bool:
+        (r, c) = sl
+        return r < 3 and r >= 0 and c < 3 and c >= 0
+
+    @staticmethod
+    def switch_player(player: Tile) -> Tile:
+        return Tile.O if player == Tile.X else Tile.X
+
+    @staticmethod
     def _is_win(t: Tile, board: List[List[TicTacToe]]) -> bool:
         # fmt: off
         return (
@@ -112,3 +121,148 @@ class UltimateTicTacToe:
             player=self.player,
             active_nonant=self.active_nonant,
         )
+
+    def play(self, sec: Section, loc: Location) -> None:
+        (R, C) = sec
+        if not UltimateTicTacToe._in_range(sec):
+            raise ValueError(f"Row {R} or column {C} outside of the Ultimate board")
+
+        if self.active_nonant and self.active_nonant != sec:
+            (activeR, activeC) = self.active_nonant
+            raise ValueError(
+                f"Last play was in section {activeR, activeC}, you must play there as well"
+            )
+
+        if self.board[R][C].finished():
+            raise ValueError(f"Section {R, C} is finished, you cannot play there.")
+
+        (r, c) = loc
+        try:
+            self.board[R][C]._play(self.player, r, c)
+        except ValueError as e:
+            raise ValueError(f"Error at trying to play {r, c} at {R, C}: {e}")
+
+        self.player = UltimateTicTacToe.switch_player(self.player)
+
+        if self.board[r][c].finished():
+            self.active_nonant = None
+        else:
+            self.active_nonant = loc
+
+    @staticmethod
+    def simplified_ttt_board(t: TicTacToe) -> List[str]:
+        # should be the same structure (length of array, and length of strings in array) as TicTacToe.show()
+        if t.win(Tile.X):
+            return [
+                "x     X",
+                " X   X ",
+                "  X X  ",
+                "  X X  ",
+                " X   X ",
+                "X     X",
+            ]
+        elif t.win(Tile.O):
+            return [
+                "  OOO  ",
+                " O   O ",
+                "O     O",
+                "O     O",
+                " O   O ",
+                "  OOO  ",
+            ]
+        elif t.finished():
+            return [
+                "- - - -",
+                " - - - ",
+                "- - - -",
+                " - - - ",
+                "- - - -",
+                " - - - ",
+            ]
+        else:
+            return t._board_array()
+
+    def show(self) -> str:
+        spacing_constant = "            |         |"
+        final = [
+            #    ---     x   ---   x   ---   x   |
+            "        0         1         2",
+            spacing_constant,
+        ]
+
+        for r in range(3):
+            board_arrays = []
+            for c in range(3):
+                board_arrays.append(
+                    UltimateTicTacToe.simplified_ttt_board(self.board[r][c])
+                )
+
+            for i in range(len(board_arrays[0])):
+                prefix = "   "
+                if i == 3:  # middle row of the mini board
+                    prefix = f" {r} "
+                final.append(
+                    f"{prefix} {board_arrays[0][i]} | {board_arrays[1][i]} | {board_arrays[2][i]}"
+                )
+
+            if r < 2:  # separate board in between the rows
+                final.append(spacing_constant)
+                final.append("   ---------+---------+---------")
+                final.append(spacing_constant)
+
+        final.append(spacing_constant)
+        final.append("\n")
+        return "\n".join(final)
+
+
+def human_game() -> None:
+    g = UltimateTicTacToe()
+    p = 0
+    t = [Tile.X, Tile.O]
+
+    while not g.finished():
+        print(f"\n{g.show()}\n")
+
+        if g.active_nonant is None:
+            print(
+                f"Last active section {g.active_nonant} is finished, or it's a new game and you have free choice."
+            )
+            sec = input(f"player {p + 1} ({t[p]}) choose a section: ").strip()
+            try:
+                RC = sec.split(",")[:2]
+                R = int(RC[0])
+                C = int(RC[1])
+            except (ValueError, IndexError):
+                print(
+                    "can't read your section input. input as comma separated, e.g. 1,1"
+                )
+                continue
+        else:
+            # gets past mypy error. if this happens, error will happen downstream when trying to play at (-1, -1)
+            (R, C) = g.active_nonant if g.active_nonant is not None else (-1, -1)
+            print(
+                f"The last active section is {R, C}, you are forced to play in that section."
+            )
+
+        loc = input(
+            f"player {p + 1} ({t[p]}) choose a location in section {R, C}: "
+        ).strip()
+        try:
+            rc = loc.split(",")[:2]
+            r = int(rc[0])
+            c = int(rc[1])
+        except (ValueError, IndexError):
+            print("can't read your location input. input as comma separated, e.g. 1,1")
+            continue
+
+        try:
+            g.play((R, C), (r, c))
+        except ValueError as e:
+            print(f"\n\n{str(e)}")
+            continue
+
+        p += 1
+        p %= 2
+
+    print(f"{g.show()}\n")
+    print("game over!")

@@ -128,8 +128,8 @@ class TicTacToe:
     def play2(self, r: int, c: int) -> None:
         self._play(Tile.O, r, c)
 
-    def show(self) -> str:
-        s = [
+    def _board_array(self) -> List[str]:
+        return [
             "  0 1 2",
             f"0 {self.board[0][0]}|{self.board[0][1]}|{self.board[0][2]}",
             "  -+-+-",
@@ -137,7 +137,9 @@ class TicTacToe:
             "  -+-+-",
             f"2 {self.board[2][0]}|{self.board[2][1]}|{self.board[2][2]}",
         ]
-        return "\n".join(s)
+
+    def show(self) -> str:
+        return "\n".join(self._board_array())
 
 
 def human_game() -> None:

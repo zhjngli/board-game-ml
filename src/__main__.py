@@ -10,8 +10,12 @@
 
 # random_walk_trained_game()
 
-from tictactoe.tictactoe import monte_carlo_many_games as ttt_mc_many_games
-from tictactoe.tictactoe import monte_carlo_trained_game as ttt_mc_trained_game
+# from tictactoe.tictactoe import monte_carlo_many_games as ttt_mc_many_games
+# from tictactoe.tictactoe import monte_carlo_trained_game as ttt_mc_trained_game
 
-ttt_mc_trained_game(training_episodes=0)
-ttt_mc_many_games()
+# ttt_mc_trained_game(training_episodes=0)
+# ttt_mc_many_games()
+
+from tictactoe.ultimate import human_game
+
+human_game()
