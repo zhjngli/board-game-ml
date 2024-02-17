@@ -16,6 +16,6 @@
 # ttt_mc_trained_game(training_episodes=0)
 # ttt_mc_many_games()
 
-from tictactoe.ultimate import human_game
+from tictactoe.ultimate import trained_game
 
-human_game()
+trained_game()

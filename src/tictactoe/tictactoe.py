@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from typing import List, NamedTuple, Tuple, override
+from typing import List, NamedTuple, Optional, Tuple, override
 
 from learners.monte_carlo import MonteCarloLearner
 from learners.q import SimpleQLearner
@@ -28,11 +28,15 @@ class TicTacToeState(NamedTuple):
 
 
 class TicTacToe:
-    def __init__(self) -> None:
-        self.reset()
+    def __init__(self, state: Optional[TicTacToeState] = None) -> None:
+        if state is None:
+            self.reset()
+        else:
+            self.board: List[List[Tile]] = list(list(row) for row in state.board)
+            self.player = state.player
 
     def reset(self) -> None:
-        self.board: List[List[Tile]] = [[Tile.N for _ in range(3)] for _ in range(3)]
+        self.board = [[Tile.N for _ in range(3)] for _ in range(3)]
         self.player = Tile.X
 
     def _in_range(self, r: int, c: int) -> bool:
@@ -62,21 +66,17 @@ class TicTacToe:
 
     @staticmethod
     def apply(state: TicTacToeState, r: int, c: int) -> TicTacToeState:
-        s = TicTacToeState(board=state.board, player=state.player)
-
-        if s.board[r][c] != Tile.N:
+        if state.board[r][c] != Tile.N:
             raise ValueError(
-                f"Board already contains tile {s.board[r][c]} at row {r} column {c}"
+                f"Board already contains tile {state.board[r][c]} at row {r} column {c}"
             )
 
-        board = list(list(row) for row in s.board)
-        board[r][c] = s.player
-        new_s = TicTacToeState(
+        board = list(list(row) for row in state.board)
+        board[r][c] = state.player
+        return TicTacToeState(
             board=TicTacToe.get_board_state(board),
-            player=Tile.O if s.player == Tile.X else Tile.X,
+            player=Tile.O if state.player == Tile.X else Tile.X,
         )
-
-        return new_s
 
     @staticmethod
     def _is_win(t: Tile, board: List[List[Tile]]) -> bool:

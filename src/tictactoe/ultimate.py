@@ -1,7 +1,9 @@
 from enum import Enum, auto
-from typing import List, NamedTuple, Tuple
+from typing import List, NamedTuple, Optional, Tuple, override
 
-from tictactoe.tictactoe import TicTacToe, Tile, TTTBoardState
+from learners.monte_carlo import MonteCarloLearner
+from learners.trainer import Trainer
+from tictactoe.tictactoe import TicTacToe, TicTacToeState, Tile, TTTBoardState
 
 
 class FinishedTTTState(Enum):
@@ -29,12 +31,15 @@ class UltimateState(NamedTuple):
 
 class UltimateTicTacToe:
     def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
         # TODO: perhaps consider not reusing TicTacToe class and optimizing it a little
         self.board: List[List[TicTacToe]] = [
             [TicTacToe() for _ in range(3)] for _ in range(3)
         ]
         self.player: Tile = Tile.X
-        self.active_nonant: Section | None = None
+        self.active_nonant: Optional[Section] = None
 
     @staticmethod
     def _in_range(sl: Section | Location) -> bool:
@@ -44,6 +49,62 @@ class UltimateTicTacToe:
     @staticmethod
     def switch_player(player: Tile) -> Tile:
         return Tile.O if player == Tile.X else Tile.X
+
+    @staticmethod
+    def apply(state: UltimateState, action: Tuple[Section, Location]) -> UltimateState:
+        (sec, loc) = action
+
+        (R, C) = sec
+        if not UltimateTicTacToe._in_range(sec):
+            raise ValueError(
+                f"Row {R} or column {C} outside of the Ultimate board, cannot apply {action}."
+            )
+
+        if state.active_nonant and state.active_nonant != sec:
+            (activeR, activeC) = state.active_nonant
+            raise ValueError(
+                f"Last play was in section {activeR, activeC}, cannot apply {action}."
+            )
+
+        section_state = state.board[R][C]
+        if (
+            section_state == FinishedTTTState.Tie
+            or section_state == FinishedTTTState.XWin
+            or section_state == FinishedTTTState.OWin
+        ):
+            raise ValueError(f"Section {R, C} is finished, cannot apply {action}.")
+
+        (r, c) = loc
+        ttt = TicTacToe(state=TicTacToeState(board=section_state, player=state.player))
+        ttt._play(state.player, r, c)
+        ttt_state = UltimateTicTacToe.get_simplified_state(ttt)
+
+        new_board_list = []
+        for i in range(3):
+            row = []
+            for j in range(3):
+                if i == R and j == C:
+                    row.append(ttt_state)
+                else:
+                    row.append(state.board[i][j])
+            new_board_list.append(row)
+
+        player = UltimateTicTacToe.switch_player(state.player)
+
+        if ttt.finished():
+            active_nonant = None
+        else:
+            active_nonant = loc
+
+        return UltimateState(
+            board=(
+                (new_board_list[0][0], new_board_list[0][1], new_board_list[0][2]),
+                (new_board_list[1][0], new_board_list[1][1], new_board_list[1][2]),
+                (new_board_list[2][0], new_board_list[2][1], new_board_list[2][2]),
+            ),
+            player=player,
+            active_nonant=active_nonant,
+        )
 
     @staticmethod
     def _is_win(t: Tile, board: List[List[TicTacToe]]) -> bool:
@@ -84,34 +145,35 @@ class UltimateTicTacToe:
         return self._is_finished(self.board)
 
     @staticmethod
-    def get_board_state(board: List[List[TicTacToe]]) -> UltimateBoardState:
-        def get_simplified_state(t: TicTacToe) -> SimplifiedTTTState:
-            if t.win(Tile.X):
-                return FinishedTTTState.XWin
-            elif t.win(Tile.O):
-                return FinishedTTTState.OWin
-            elif t.board_filled():
-                return FinishedTTTState.Tie
-            else:
-                return t.get_state().board
+    def get_simplified_state(t: TicTacToe) -> SimplifiedTTTState:
+        if t.win(Tile.X):
+            return FinishedTTTState.XWin
+        elif t.win(Tile.O):
+            return FinishedTTTState.OWin
+        elif t.board_filled():
+            return FinishedTTTState.Tie
+        else:
+            return t.get_state().board
 
+    @staticmethod
+    def get_board_state(board: List[List[TicTacToe]]) -> UltimateBoardState:
         # really ugly way to get correct typing :x
         # assumes that the board is 3 rows and 3 columns
         return (
             (
-                get_simplified_state(board[0][0]),
-                get_simplified_state(board[0][1]),
-                get_simplified_state(board[0][2]),
+                UltimateTicTacToe.get_simplified_state(board[0][0]),
+                UltimateTicTacToe.get_simplified_state(board[0][1]),
+                UltimateTicTacToe.get_simplified_state(board[0][2]),
             ),
             (
-                get_simplified_state(board[1][0]),
-                get_simplified_state(board[1][1]),
-                get_simplified_state(board[1][2]),
+                UltimateTicTacToe.get_simplified_state(board[1][0]),
+                UltimateTicTacToe.get_simplified_state(board[1][1]),
+                UltimateTicTacToe.get_simplified_state(board[1][2]),
             ),
             (
-                get_simplified_state(board[2][0]),
-                get_simplified_state(board[2][1]),
-                get_simplified_state(board[2][2]),
+                UltimateTicTacToe.get_simplified_state(board[2][0]),
+                UltimateTicTacToe.get_simplified_state(board[2][1]),
+                UltimateTicTacToe.get_simplified_state(board[2][2]),
             ),
         )
 
@@ -140,7 +202,7 @@ class UltimateTicTacToe:
         try:
             self.board[R][C]._play(self.player, r, c)
         except ValueError as e:
-            raise ValueError(f"Error at trying to play {r, c} at {R, C}: {e}")
+            raise ValueError(f"Error trying to play {r, c} at {R, C}: {e}")
 
         self.player = UltimateTicTacToe.switch_player(self.player)
 
@@ -185,7 +247,6 @@ class UltimateTicTacToe:
     def show(self) -> str:
         spacing_constant = "            |         |"
         final = [
-            #    ---     x   ---   x   ---   x   |
             "        0         1         2",
             spacing_constant,
         ]
@@ -266,3 +327,122 @@ def human_game() -> None:
 
     print(f"{g.show()}\n")
     print("game over!")
+
+
+class UltimateMonteCarloTrainer(UltimateTicTacToe, Trainer):
+    def __init__(self, p1: MonteCarloLearner, p2: MonteCarloLearner) -> None:
+        super().__init__()
+        self.p1 = p1
+        self.p2 = p2
+
+    @override
+    def train(self, episodes=1000) -> None:
+        super().train(episodes)
+
+        self.p1.save_policy()
+        self.p2.save_policy()
+
+    def train_once(self) -> None:
+        while not self.finished():
+            r, c = self.p1.choose_action(self.get_state())
+            self.play(r, c)
+            self.p1.add_state(self.get_state())
+
+            if self.finished():
+                break
+
+            r, c = self.p2.choose_action(self.get_state())
+            self.play(r, c)
+            self.p2.add_state(self.get_state())
+
+            if self.finished():
+                break
+
+        self.give_rewards()
+        self.reset()
+        self.p1.reset_states()
+        self.p2.reset_states()
+
+    def give_rewards(self) -> None:
+        # TODO: how might changing these rewards affect behavior?
+        if self.win(Tile.X):
+            self.p1.propagate_reward(1)
+            self.p2.propagate_reward(0)
+        elif self.win(Tile.O):
+            self.p1.propagate_reward(0)
+            self.p2.propagate_reward(1)
+        elif self.board_filled():
+            self.p1.propagate_reward(0.1)
+            self.p2.propagate_reward(0.5)
+        else:
+            raise Exception("giving rewards when game's not over. something's wrong!")
+
+
+class UltimateMonteCarloLearner(
+    MonteCarloLearner[UltimateState, Tuple[Section, Location]]
+):
+    def get_actions_from_state(
+        self, state: UltimateState
+    ) -> List[Tuple[Section, Location]]:
+        if state.active_nonant is not None:
+            (R, C) = state.active_nonant
+            ttt_state = state.board[R][C]
+            if (
+                ttt_state != FinishedTTTState.Tie
+                and ttt_state != FinishedTTTState.XWin
+                and ttt_state != FinishedTTTState.OWin
+            ):
+                return [
+                    ((R, C), (r, c))
+                    for r in range(3)
+                    for c in range(3)
+                    if ttt_state[r][c] == Tile.N
+                ]
+
+        actions = []
+        for R in range(3):
+            for C in range(3):
+                ttt_state = state.board[R][C]
+                for r in range(3):
+                    for c in range(3):
+                        if (
+                            ttt_state != FinishedTTTState.Tie
+                            and ttt_state != FinishedTTTState.XWin
+                            and ttt_state != FinishedTTTState.OWin
+                        ):
+                            if ttt_state[r][c] == Tile.N:
+                                actions.append(((R, C), (r, c)))
+
+        return actions
+
+    def apply(
+        self, state: UltimateState, action: Tuple[Section, Location]
+    ) -> UltimateState:
+        return UltimateTicTacToe.apply(state, action)
+
+
+MCP1_POLICY = "src/tictactoe/ultimate-mcp1.pkl"
+MCP2_POLICY = "src/tictactoe/ultimate-mcp2.pkl"
+
+
+def trained_game():
+    computer1 = UltimateMonteCarloLearner(policy_file=MCP1_POLICY)
+    computer2 = UltimateMonteCarloLearner(policy_file=MCP2_POLICY)
+    g = UltimateMonteCarloTrainer(p1=computer1, p2=computer2)
+    g.train(episodes=0)
+
+    while not g.finished():
+        print(f"\n{g.show()}\n")
+        sec, loc = computer1.choose_action(g.get_state(), exploit=True)
+        g.play(sec, loc)
+        print(f"computer X plays at section {sec} location {loc}")
+        if g.finished():
+            break
+
+        print(f"\n{g.show()}\n")
+        sec, loc = computer2.choose_action(g.get_state(), exploit=True)
+        g.play(sec, loc)
+        print(f"computer O plays at section {sec} location {loc}")
+
+    print(g.show())
+    print("\ngame over!")
