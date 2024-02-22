@@ -1,6 +1,8 @@
 import pickle
 from enum import Enum, auto
-from typing import List, override
+from typing import List
+
+from typing_extensions import override
 
 from learners.monte_carlo import MonteCarloLearner
 from learners.q import SimpleQLearner

@@ -2,9 +2,10 @@ import random
 from abc import ABC, abstractmethod
 from collections import Counter
 from math import ceil
-from typing import List, NamedTuple, Tuple, override
+from typing import List, NamedTuple, Tuple
 
 import matplotlib.pyplot as plt
+from typing_extensions import override
 
 from digit_party.data import max_conns
 from learners.q import SimpleQLearner
@@ -344,10 +345,12 @@ def trained_game(game_size: int) -> None:
     # this type of naive training kinda maxes out at a 3x3 game, of around 60-65% of the max score.
     # for a 2x2 game, the result is trivially 100%
     q = DigitPartyQLearner(
-        game_size, q_pickle=f"src/digit_party/q-{game_size}x{game_size}.pkl"
+        game_size,
+        q_pickle=f"src/digit_party/q-{game_size}x{game_size}.pkl",
+        epsilon=0.5,
     )
     g = DigitPartyQTrainer(player=q, n=game_size)
-    g.train(episodes=100000)
+    g.train(episodes=10000000)
 
     while not g.finished():
         print(f"\n{g.show_board()}\n")

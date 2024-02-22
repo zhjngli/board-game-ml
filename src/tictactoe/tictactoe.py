@@ -1,5 +1,7 @@
 from enum import Enum, auto
-from typing import List, NamedTuple, Optional, Tuple, override
+from typing import List, NamedTuple, Optional, Tuple
+
+from typing_extensions import override
 
 from learners.monte_carlo import MonteCarloLearner
 from learners.q import SimpleQLearner
