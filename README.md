@@ -26,3 +26,12 @@ Both of these methods currently use native python, without any fancy libraries o
   - [ultimate tic tac toe](https://en.wikipedia.org/wiki/Ultimate_tic-tac-toe)
   - [photosynthesis](https://boardgamegeek.com/boardgame/218603/photosynthesis)
 - deep q-learning
+
+## References
+- [TicTacToe](https://github.com/ShangtongZhang/reinforcement-learning-an-introduction/blob/master/chapter01/tic_tac_toe.py) with a simple Monte Carlo learning implementation
+- [Ultimate TicTacToe](https://github.com/Arnav235/ultimate_tic-tac-toe_alphazero) with the AlphaZero algorithm
+- [Monte Carlo Tree Search](https://blog.theofekfoundation.org/artificial-intelligence/2016/06/27/what-is-the-monte-carlo-tree-search/)
+- [AlphaZero tutorial](https://web.stanford.edu/~surag/posts/alphazero.html)
+- More [Monte Carlo Tree Search](https://web.archive.org/web/20180629082128/http://mcts.ai/index.html)
+- Original [AlphaZero paper](https://www.nature.com/articles/nature24270.epdf?author_access_token=VJXbVjaSHxFoctQQ4p2k4tRgN0jAjWel9jnR3ZoTv0PVW4gB86EEpGqTRDtpIz-2rmo8-KG06gqVobU5NSCFeHILHcVFUeMsbvwS-lxjqQGg98faovwjxeTUgZAUMnRQ)
+- [Deep Q Learning](https://towardsdatascience.com/how-to-teach-an-ai-to-play-games-deep-reinforcement-learning-28f9b920440a)
