@@ -395,8 +395,8 @@ def _many_games(
     print(f"{ties} ties")
 
 
-MCP1_POLICY = "src/tictactoe/mcp1.pkl"
-MCP2_POLICY = "src/tictactoe/mcp2.pkl"
+MCP1_POLICY = "src/games/tictactoe/mcp1.pkl"
+MCP2_POLICY = "src/games/tictactoe/mcp2.pkl"
 
 
 def monte_carlo_trained_game(training_episodes=0):
@@ -416,8 +416,8 @@ def monte_carlo_many_games(games=10000):
     _many_games(g, computer1, computer2, games)
 
 
-QP1_POLICY = "src/tictactoe/qp1.pkl"
-QP2_POLICY = "src/tictactoe/qp2.pkl"
+QP1_POLICY = "src/games/tictactoe/qp1.pkl"
+QP2_POLICY = "src/games/tictactoe/qp2.pkl"
 
 
 def q_trained_game(training_episodes=0):

@@ -346,7 +346,7 @@ def trained_game(game_size: int) -> None:
     # for a 2x2 game, the result is trivially 100%
     q = DigitPartyQLearner(
         game_size,
-        q_pickle=f"src/digit_party/q-{game_size}x{game_size}.pkl",
+        q_pickle=f"src/games/digit_party/q-{game_size}x{game_size}.pkl",
         epsilon=0.5,
     )
     g = DigitPartyQTrainer(player=q, n=game_size)
@@ -370,7 +370,7 @@ def trained_game(game_size: int) -> None:
 
 def many_trained_games(game_size: int, games=10000) -> None:
     q = DigitPartyQLearner(
-        game_size, q_pickle=f"src/digit_party/q-{game_size}x{game_size}.pkl"
+        game_size, q_pickle=f"src/games/digit_party/q-{game_size}x{game_size}.pkl"
     )
     g = DigitPartyQTrainer(player=q, n=game_size)
 

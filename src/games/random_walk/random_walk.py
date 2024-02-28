@@ -114,7 +114,7 @@ class RandomWalkQTrainer(RandomWalk, Trainer):
 
 
 def q_trained_game() -> None:
-    pkl_file = "src/random_walk/q.pkl"
+    pkl_file = "src/games/random_walk/q.pkl"
     q = RandomWalkQLearner(epsilon=0.5, q_pickle=pkl_file)
     g = RandomWalkQTrainer(player=q)
     g.train()
@@ -173,7 +173,7 @@ class RandomWalkMonteCarloTrainer(RandomWalk):
 
 
 def monte_carlo_trained_game(training_episodes=10000):
-    policy_pkl = "src/random_walk/monte_carlo_player.pkl"
+    policy_pkl = "src/games/random_walk/monte_carlo_player.pkl"
     p = RandomWalkMonteCarloLearner(policy_file=policy_pkl)
     g = RandomWalkMonteCarloTrainer(p)
     g.train(episodes=training_episodes)

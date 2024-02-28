@@ -423,8 +423,8 @@ class UltimateMonteCarloLearner(
         return UltimateTicTacToe.apply(state, action)
 
 
-MCP1_POLICY = "src/tictactoe/ultimate-mcp1.pkl"
-MCP2_POLICY = "src/tictactoe/ultimate-mcp2.pkl"
+MCP1_POLICY = "src/games/tictactoe/ultimate-mcp1.pkl"
+MCP2_POLICY = "src/games/tictactoe/ultimate-mcp2.pkl"
 
 
 def trained_game():

@@ -98,7 +98,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
         best_a = -1
 
         # find the action with the highest upper confidence bound u
-        # u(s, a) = q(s, q) + c_puct * pi(s, a) * sqrt(sum all actions b: (N(s, b)) / (1 + N(s, a))
+        # u(s, a) = q(s, a) + c_puct * pi(s, a) * sqrt(sum all actions b: (N(s, b)) / (1 + N(s, a))
         for a in range(self.game.num_actions()):
             if valids[a]:
                 if (ir, a) in self.q:
