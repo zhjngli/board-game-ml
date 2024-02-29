@@ -3,9 +3,9 @@ from typing import List, NamedTuple, Optional, Tuple
 
 from typing_extensions import override
 
+from games.tictactoe.tictactoe import TicTacToe, TicTacToeState, Tile, TTTBoardState
 from learners.monte_carlo import MonteCarloLearner
 from learners.trainer import Trainer
-from tictactoe.tictactoe import TicTacToe, TicTacToeState, Tile, TTTBoardState
 
 
 class FinishedTTTState(Enum):
@@ -431,7 +431,7 @@ def trained_game():
     computer1 = UltimateMonteCarloLearner(policy_file=MCP1_POLICY)
     computer2 = UltimateMonteCarloLearner(policy_file=MCP2_POLICY)
     g = UltimateMonteCarloTrainer(p1=computer1, p2=computer2)
-    g.train(episodes=0)
+    g.train(episodes=10000)
 
     while not g.finished():
         print(f"\n{g.show()}\n")

@@ -7,7 +7,7 @@ from typing import List, NamedTuple, Tuple
 import matplotlib.pyplot as plt
 from typing_extensions import override
 
-from digit_party.data import max_conns
+from games.digit_party.data import max_conns
 from learners.q import SimpleQLearner
 from learners.trainer import Trainer
 
@@ -401,7 +401,7 @@ def many_trained_games(game_size: int, games=10000) -> None:
 
     plt.hist(percentages, bins=50)
     plt.xticks(range(0, 101, 2))
-    plt.yticks(range(0, 1000, 25))
+    plt.yticks(range(0, 2000, 50))
     plt.title("games played per percent score")
     plt.xlabel("percent score")
     plt.ylabel("number of games")

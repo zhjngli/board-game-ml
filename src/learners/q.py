@@ -18,7 +18,7 @@ class SimpleQLearner(Generic[StateType, ActionType], ABC):
     def __init__(self, q_pickle: str = "", alpha=0.1, gamma=0.9, epsilon=0.1) -> None:
         self.q_pickle = q_pickle
         self.q_table: defaultdict[StateType, dict[ActionType, float]] = defaultdict(
-            self.default_action_q_values
+            self.default_action_q_values  # TODO: pickle can't find this if refactored
         )
         if self.q_pickle and os.path.isfile(self.q_pickle):
             with open(self.q_pickle, "rb") as file:

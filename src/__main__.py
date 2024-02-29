@@ -1,5 +1,7 @@
 # from games.digit_party.digit_party import human_game as digit_party_human_game
-# from games.digit_party.digit_party import many_trained_games as digit_party_many_trained_games
+# from games.digit_party.digit_party import (
+#     many_trained_games as digit_party_many_trained_games,
+# )
 # from games.digit_party.digit_party import trained_game as digit_party_trained_game
 
 # digit_party_human_game()
@@ -13,7 +15,7 @@
 # from games.tictactoe.tictactoe import monte_carlo_many_games as ttt_mc_many_games
 # from games.tictactoe.tictactoe import monte_carlo_trained_game as ttt_mc_trained_game
 
-# ttt_mc_trained_game(training_episodes=0)
+# ttt_mc_trained_game(training_episodes=1000000)
 # ttt_mc_many_games()
 
 from games.tictactoe.ultimate import trained_game
