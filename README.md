@@ -19,13 +19,22 @@ Both of these methods currently use native python, without any fancy libraries o
 - A [random walk game](src/random_walk/random_walk.py) which scores points at the right bound and loses points at the left bound. This is trained with q-learning and a monte carlo method.
 - [Tic-tac-toe](src/tictactoe/tictactoe.py). This game can be successfully trained using the monte carlo learning method.
 - [Digit party](src/digit_party/digit_party.py). Though naive q-learning should be able to learn this game, it is intractable as the number of states is just too high. Deep q-learning should work better.
+- [Ultimate tic tac toe](https://en.wikipedia.org/wiki/Ultimate_tic-tac-toe). Works ok with simple Monte Carlo method but hopefully better with Alpha Zero.
 
-## TODO
-- consider implementing the following games and train them
-  - [nim](https://en.wikipedia.org/wiki/Nim)
-  - [ultimate tic tac toe](https://en.wikipedia.org/wiki/Ultimate_tic-tac-toe)
-  - [photosynthesis](https://boardgamegeek.com/boardgame/218603/photosynthesis)
+### TODO
+
+#### Games
+
+Consider implementing the following games and train them using an appropriate method:
+- [nim](https://en.wikipedia.org/wiki/Nim)
+- [photosynthesis](https://boardgamegeek.com/boardgame/218603/photosynthesis)
+
+#### ML Methods
 - deep q-learning
+
+#### Tech debt
+- refactor simple q and monte-carlo learners to use composition rather than inheritance. been lazy to do this
+- clean up functions in Ultimate/TTT game classes. function names could be better, and ordering/structuring could be better
 
 ## References
 - [TicTacToe](https://github.com/ShangtongZhang/reinforcement-learning-an-introduction/blob/master/chapter01/tic_tac_toe.py) with a simple Monte Carlo learning implementation
