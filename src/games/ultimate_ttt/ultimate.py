@@ -194,7 +194,12 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
 
     @staticmethod
     def _is_board_filled(board: UltimateBoard) -> bool:
-        return bool(np.all(board != Empty))
+        for row in board:
+            for b in row:
+                s = TicTacToeState(board=b, player=P1)
+                if not TicTacToe.finished(s):
+                    return False
+        return True
 
     def board_filled(self) -> bool:
         return self._is_board_filled(self.board)
@@ -205,7 +210,6 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         xWin = UltimateTicTacToe._is_win(P1, board)
         oWin = UltimateTicTacToe._is_win(P2, board)
 
-        # TODO: if board is filled, check who won more squares?
         return xWin or oWin or UltimateTicTacToe._is_board_filled(board)
 
     def is_finished(self) -> bool:
@@ -388,6 +392,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         elif UltimateTicTacToe._is_win(P2, state.board):
             return P2WIN
         elif UltimateTicTacToe._is_board_filled(state.board):
+            # TODO: if board is filled, check who won more squares?
             return 0  # TODO: different value for draws?
         else:
             raise RuntimeError(f"Calling reward function when game not ended: {state}")

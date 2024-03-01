@@ -174,7 +174,7 @@ def trained_game():
     computer1 = UltimateMonteCarloLearner(policy_file=MCP1_POLICY)
     computer2 = UltimateMonteCarloLearner(policy_file=MCP2_POLICY)
     g = UltimateMonteCarloTrainer(p1=computer1, p2=computer2)
-    g.train(episodes=1)
+    g.train(episodes=1000)
 
     while not g.is_finished():
         print(f"\n{g.show()}\n")
