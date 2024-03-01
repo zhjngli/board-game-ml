@@ -5,7 +5,7 @@ from typing import Dict, Generic, List, NamedTuple, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from games.game import Action, Game, ImmutableRepresentation, State
+from games.game import Action, ActionStatus, Game, ImmutableRepresentation, State
 from nn.neural_network import NeuralNetwork
 
 
@@ -34,7 +34,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
         self.evs: Dict[ImmutableRepresentation, float] = (
             {}
         )  # value at game end, or 0 if the game is not finished yet
-        self.vas: Dict[ImmutableRepresentation, List[Action]] = (
+        self.vas: Dict[ImmutableRepresentation, List[ActionStatus]] = (
             {}
         )  # valid actions at a game state
         self.ps: Dict[ImmutableRepresentation, NDArray] = (

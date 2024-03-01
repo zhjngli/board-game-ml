@@ -1,45 +1,72 @@
-from enum import Enum, auto
-from typing import List, NamedTuple, Optional, Tuple
+from typing import Annotated, List, Literal, NamedTuple, Optional, Tuple
 
+import numpy as np
+from numpy.typing import NDArray
 from typing_extensions import override
 
+from games.game import (
+    P1,
+    P1WIN,
+    P2,
+    P2WIN,
+    Action,
+    ActionStatus,
+    BasicState,
+    Game,
+    Player,
+    switch_player,
+)
 from learners.monte_carlo import MonteCarloLearner
 from learners.q import SimpleQLearner
 from learners.trainer import Trainer
 
-
-class Tile(Enum):
-    N = auto()
-    X = auto()
-    O = auto()  # noqa: E741
-
-    def __str__(self) -> str:
-        if self.name == "N":
-            return " "
-        return f"{self.name}"
+Tile = Literal[1, 0, -1]
+XTile: Tile = 1
+OTile: Tile = -1
+Empty: Tile = 0
 
 
-TTTBoardState = Tuple[
+def tile_char(t: Tile) -> str:
+    if t == Empty:
+        return " "
+    elif t == XTile:
+        return "X"
+    elif t == OTile:
+        return "O"
+    else:
+        raise Exception("Typing Tile literals should have caught this case")
+
+
+TTTBoard = Annotated[NDArray, Literal[3, 3]]  # TODO: force NDArray to hold Tile types?
+TTTBoardIR = Tuple[
     Tuple[Tile, Tile, Tile], Tuple[Tile, Tile, Tile], Tuple[Tile, Tile, Tile]
 ]
 
 
-class TicTacToeState(NamedTuple):
-    board: TTTBoardState
-    player: Tile
+class TicTacToeIR(NamedTuple):
+    board: TTTBoardIR
+    player: Player
 
 
-class TicTacToe:
-    def __init__(self, state: Optional[TicTacToeState] = None) -> None:
+class TicTacToeState(BasicState):
+    def __init__(self, board: TTTBoard, player: Player) -> None:
+        super().__init__(board, player)
+
+
+# TODO: mixing a lot of state/IR nomenclature due to refactoring. clean that up
+# TODO: would be cleaner to have a way to get IR from the game itself instead of passing the state to the static method
+# TODO: CLEANUP, play and apply are kinda redundant?
+class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
+    def __init__(self, state: Optional[TicTacToeIR] = None) -> None:
         if state is None:
             self.reset()
         else:
-            self.board: List[List[Tile]] = list(list(row) for row in state.board)
-            self.player = state.player
+            self.board: TTTBoard = np.asarray(list(list(row) for row in state.board))
+            self.player: Player = state.player
 
     def reset(self) -> None:
-        self.board = [[Tile.N for _ in range(3)] for _ in range(3)]
-        self.player = Tile.X
+        self.board = np.zeros((3, 3))
+        self.player = P1
 
     def _in_range(self, r: int, c: int) -> bool:
         return r < 3 and r >= 0 and c < 3 and c >= 0
@@ -48,16 +75,19 @@ class TicTacToe:
         if not self._in_range(r, c):
             raise ValueError(f"Row {r} or column {c} outside of the TicTacToe board")
 
-        if self.board[r][c] != Tile.N:
+        if self.board[r][c] != Empty:
             raise ValueError(
                 f"Board already contains tile {self.board[r][c]} at row {r} column {c}"
             )
 
+        if self.player != t:
+            raise ValueError(f"Trying to play tile {t} as player {self.player}")
+
         self.board[r][c] = t
-        self.player = Tile.O if self.player == Tile.X else Tile.X
+        self.player = switch_player(self.player)
 
     @staticmethod
-    def get_board_state(board: List[List[Tile]]) -> TTTBoardState:
+    def get_board_rep(board: TTTBoard) -> TTTBoardIR:
         # really ugly way to get correct typing :x
         # assumes that the board is 3 rows and 3 columns
         return (
@@ -67,88 +97,142 @@ class TicTacToe:
         )
 
     @staticmethod
-    def apply(state: TicTacToeState, r: int, c: int) -> TicTacToeState:
-        if state.board[r][c] != Tile.N:
+    def apply(state: TicTacToeState, a: Action) -> TicTacToeState:
+        r = int(a / 3)
+        c = int(a % 3)
+        if state.board[r][c] != Empty:
             raise ValueError(
                 f"Board already contains tile {state.board[r][c]} at row {r} column {c}"
             )
 
-        board = list(list(row) for row in state.board)
+        # TODO: does this need a copy?
+        board = state.board
         board[r][c] = state.player
         return TicTacToeState(
-            board=TicTacToe.get_board_state(board),
-            player=Tile.O if state.player == Tile.X else Tile.X,
+            board=board,
+            player=switch_player(state.player),
         )
 
     @staticmethod
-    def _is_win(t: Tile, board: List[List[Tile]]) -> bool:
+    def applyIR(ir: TicTacToeIR, a: Action) -> TicTacToeIR:
+        s = TicTacToeState(board=np.asarray(ir.board), player=ir.player)
+        return TicTacToe.immutable_representation(TicTacToe.apply(s, a))
+
+    @staticmethod
+    def _is_win(p: Player, board: TTTBoard) -> bool:
         # fmt: off
         return (
             # horizontal
-            (board[0][0] == t and board[0][1] == t and board[0][2] == t) or  # noqa: W504
-            (board[1][0] == t and board[1][1] == t and board[1][2] == t) or  # noqa: W504
-            (board[2][0] == t and board[2][1] == t and board[2][2] == t) or  # noqa: W504
+            (board[0][0] == p and board[0][1] == p and board[0][2] == p) or  # noqa: W504
+            (board[1][0] == p and board[1][1] == p and board[1][2] == p) or  # noqa: W504
+            (board[2][0] == p and board[2][1] == p and board[2][2] == p) or  # noqa: W504
             # vertical
-            (board[0][0] == t and board[1][0] == t and board[2][0] == t) or  # noqa: W504
-            (board[0][1] == t and board[1][1] == t and board[2][1] == t) or  # noqa: W504
-            (board[0][2] == t and board[1][2] == t and board[2][2] == t) or  # noqa: W504
+            (board[0][0] == p and board[1][0] == p and board[2][0] == p) or  # noqa: W504
+            (board[0][1] == p and board[1][1] == p and board[2][1] == p) or  # noqa: W504
+            (board[0][2] == p and board[1][2] == p and board[2][2] == p) or  # noqa: W504
             # diag
-            (board[0][0] == t and board[1][1] == t and board[2][2] == t) or  # noqa: W504
-            (board[2][0] == t and board[1][1] == t and board[0][2] == t)
+            (board[0][0] == p and board[1][1] == p and board[2][2] == p) or  # noqa: W504
+            (board[2][0] == p and board[1][1] == p and board[0][2] == p)
         )
         # fmt: on
 
-    def win(self, t: Tile) -> bool:
-        return self._is_win(t, self.board)
+    def win(self, p: Player) -> bool:
+        return TicTacToe._is_win(p, self.board)
 
     @staticmethod
-    def _is_board_filled(board: List[List[Tile]]) -> bool:
-        return all(all(t != Tile.N for t in row) for row in board)
+    def _is_board_filled(board: TTTBoard) -> bool:
+        return bool(np.all(board != Empty))
 
     def board_filled(self) -> bool:
         return self._is_board_filled(self.board)
 
     @staticmethod
-    def _is_finished(board: List[List[Tile]]) -> bool:
-        xWin = TicTacToe._is_win(Tile.X, board)
-        oWin = TicTacToe._is_win(Tile.O, board)
+    def finished(state: TicTacToeState) -> bool:
+        board = state.board
+        xWin = TicTacToe._is_win(P1, board)
+        oWin = TicTacToe._is_win(P2, board)
 
         return xWin or oWin or TicTacToe._is_board_filled(board)
 
-    def finished(self) -> bool:
-        return self._is_finished(self.board)
-
-    def get_state(self) -> TicTacToeState:
-        return TicTacToeState(TicTacToe.get_board_state(self.board), self.player)
+    def is_finished(self) -> bool:
+        return TicTacToe.finished(self.state())
 
     def play(self, r: int, c: int) -> None:
         self._play(self.player, r, c)
 
     def play1(self, r: int, c: int) -> None:
-        self._play(Tile.X, r, c)
+        self._play(XTile, r, c)
 
     def play2(self, r: int, c: int) -> None:
-        self._play(Tile.O, r, c)
+        self._play(OTile, r, c)
 
-    def _board_array(self) -> List[str]:
+    @staticmethod
+    def board_array(t: TTTBoard) -> List[str]:
         return [
             "  0 1 2",
-            f"0 {self.board[0][0]}|{self.board[0][1]}|{self.board[0][2]}",
+            f"0 {tile_char(t[0][0])}|{tile_char(t[0][1])}|{tile_char(t[0][2])}",
             "  -+-+-",
-            f"1 {self.board[1][0]}|{self.board[1][1]}|{self.board[1][2]}",
+            f"1 {tile_char(t[1][0])}|{tile_char(t[1][1])}|{tile_char(t[1][2])}",
             "  -+-+-",
-            f"2 {self.board[2][0]}|{self.board[2][1]}|{self.board[2][2]}",
+            f"2 {tile_char(t[2][0])}|{tile_char(t[2][1])}|{tile_char(t[2][2])}",
         ]
 
     def show(self) -> str:
-        return "\n".join(self._board_array())
+        return "\n".join(TicTacToe.board_array(self.board))
+
+    @staticmethod
+    def num_actions() -> int:
+        return 9  # one for each area of the board
+
+    @staticmethod
+    def actions(state: TicTacToeState) -> List[ActionStatus]:
+        b = np.copy(state.board)
+        b[b != Empty] = 0
+        b[b == Empty] = 1
+        return list(b.reshape(TicTacToe.num_actions()))
+
+    @staticmethod
+    def symmetries(a: NDArray) -> List[NDArray]:
+        syms: List[NDArray] = []
+        b = np.copy(a)
+        for i in range(1, 5):
+            for mirror in [True, False]:
+                s = np.rot90(b, i)
+                if mirror:
+                    s = np.fliplr(s)
+                syms += s
+        return syms
+
+    @staticmethod
+    def immutable_representation(state: TicTacToeState) -> TicTacToeIR:
+        return TicTacToeIR(
+            board=TicTacToe.get_board_rep(state.board), player=state.player
+        )
+
+    @staticmethod
+    def oriented_state(state: TicTacToeState) -> TicTacToeState:
+        return TicTacToeState(board=state.board * state.player, player=P1)
+
+    @staticmethod
+    def reward(state: TicTacToeState) -> float:
+        if TicTacToe._is_win(P1, state.board):
+            return P1WIN
+        elif TicTacToe._is_win(P2, state.board):
+            return P2WIN
+        elif TicTacToe._is_board_filled(state.board):
+            return 0  # TODO: different value for draws?
+        else:
+            raise RuntimeError(f"Calling reward function when game not ended: {state}")
+
+    def state(self) -> TicTacToeState:
+        return TicTacToeState(board=self.board, player=self.player)
 
 
 def human_game() -> None:
     g = TicTacToe()
     p = 0
     play = [g.play1, g.play2]
-    while not g.finished():
+    while not g.is_finished():
         print()
         print(g.show())
         print()
@@ -189,19 +273,19 @@ class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
         self.p2.save_policy()
 
     def train_once(self) -> None:
-        while not self.finished():
-            r, c = self.p1.choose_action(self.get_state())
+        while not self.is_finished():
+            r, c = self.p1.choose_action(self.immutable_representation(self.state()))
             self.play1(r, c)
-            self.p1.add_state(self.get_state())
+            self.p1.add_state(self.immutable_representation(self.state()))
 
-            if self.finished():
+            if self.is_finished():
                 break
 
-            r, c = self.p2.choose_action(self.get_state())
+            r, c = self.p2.choose_action(self.immutable_representation(self.state()))
             self.play2(r, c)
-            self.p2.add_state(self.get_state())
+            self.p2.add_state(self.immutable_representation(self.state()))
 
-            if self.finished():
+            if self.is_finished():
                 break
 
         self.give_rewards()
@@ -211,28 +295,31 @@ class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
 
     def give_rewards(self) -> None:
         # TODO: how might changing these rewards affect behavior?
-        if self.win(Tile.X):
+        if self.win(P1):
             self.p1.propagate_reward(1)
             self.p2.propagate_reward(0)
-        elif self.win(Tile.O):
+        elif self.win(P2):
             self.p1.propagate_reward(0)
             self.p2.propagate_reward(1)
         elif self.board_filled():
             self.p1.propagate_reward(0.1)
             self.p2.propagate_reward(0.5)
         else:
-            raise Exception("giving rewards when game's not over. something's wrong!")
+            raise RuntimeError(
+                "giving rewards when game's not over. something's wrong!"
+            )
 
 
-class TicTacToeMonteCarloLearner(MonteCarloLearner[TicTacToeState, Tuple[int, int]]):
-    def get_actions_from_state(self, state: TicTacToeState) -> List[Tuple[int, int]]:
+class TicTacToeMonteCarloLearner(MonteCarloLearner[TicTacToeIR, Tuple[int, int]]):
+    def get_actions_from_state(self, state: TicTacToeIR) -> List[Tuple[int, int]]:
         return [
-            (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Tile.N
+            (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Empty
         ]
 
-    def apply(self, state: TicTacToeState, action: Tuple[int, int]) -> TicTacToeState:
+    def apply(self, state: TicTacToeIR, action: Tuple[int, int]) -> TicTacToeIR:
         r, c = action
-        return TicTacToe.apply(state, r, c)
+        a = r * 3 + c
+        return TicTacToe.applyIR(state, a)
 
 
 class TicTacToeQTrainer(TicTacToe, Trainer):
@@ -250,35 +337,47 @@ class TicTacToeQTrainer(TicTacToe, Trainer):
 
     # TODO: this training is pretty dumb, doesn't work well
     def train_once(self) -> None:
-        while not self.finished():
-            state = self.get_state()
-            action = self.p1.choose_action(state)
+        while not self.is_finished():
+            ir = self.immutable_representation(self.state())
+            action = self.p1.choose_action(ir)
             r, c = action
             self.play1(r, c)
 
-            if self.finished():
+            if self.is_finished():
                 break
 
-            state = self.get_state()
-            action = self.p2.choose_action(state)
+            ir = self.immutable_representation(self.state())
+            action = self.p2.choose_action(ir)
             r, c = action
             self.play2(r, c)
 
-        if self.win(Tile.X):
-            self.p1.update_q_value(state, action, 1, self.get_state())
-            self.p2.update_q_value(state, action, -1, self.get_state())
-        elif self.win(Tile.O):
-            self.p1.update_q_value(state, action, -1, self.get_state())
-            self.p2.update_q_value(state, action, 1, self.get_state())
+        if self.win(P1):
+            self.p1.update_q_value(
+                ir, action, 1, self.immutable_representation(self.state())
+            )
+            self.p2.update_q_value(
+                ir, action, -1, self.immutable_representation(self.state())
+            )
+        elif self.win(P2):
+            self.p1.update_q_value(
+                ir, action, -1, self.immutable_representation(self.state())
+            )
+            self.p2.update_q_value(
+                ir, action, 1, self.immutable_representation(self.state())
+            )
         elif self.board_filled():
-            self.p1.update_q_value(state, action, -0.1, self.get_state())
-            self.p2.update_q_value(state, action, 0, self.get_state())
+            self.p1.update_q_value(
+                ir, action, -0.1, self.immutable_representation(self.state())
+            )
+            self.p2.update_q_value(
+                ir, action, 0, self.immutable_representation(self.state())
+            )
         else:
             raise Exception("giving rewards when game's not over. something's wrong!")
         self.reset()
 
 
-class TicTacToeQLearner(SimpleQLearner[TicTacToeState, Tuple[int, int]]):
+class TicTacToeQLearner(SimpleQLearner[TicTacToeIR, Tuple[int, int]]):
     def default_action_q_values(self) -> dict[Tuple[int, int], float]:
         actions = {}
         for r in range(3):
@@ -286,15 +385,15 @@ class TicTacToeQLearner(SimpleQLearner[TicTacToeState, Tuple[int, int]]):
                 actions[(r, c)] = 0.0
         return actions
 
-    def get_actions_from_state(self, state: TicTacToeState) -> List[Tuple[int, int]]:
+    def get_actions_from_state(self, state: TicTacToeIR) -> List[Tuple[int, int]]:
         return [
-            (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Tile.N
+            (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Empty
         ]
 
 
 def _computer_play(g: TicTacToe, p: TicTacToeMonteCarloLearner | TicTacToeQLearner):
     print(f"\n{g.show()}\n")
-    r, c = p.choose_action(g.get_state(), exploit=True)
+    r, c = p.choose_action(g.immutable_representation(g.state()), exploit=True)
     g.play(r, c)
     print(f"\ncomputer plays at ({r}, {c})!")
 
@@ -337,7 +436,7 @@ def _trained_game(  # noqa: C901
     else:
         print("unrecognized input, defaulting to player 1!")
 
-    while not g.finished():
+    while not g.is_finished():
         if p == 0:
             _computer_play(g, computer2)
         else:
@@ -347,7 +446,7 @@ def _trained_game(  # noqa: C901
                 print(str(e))
                 continue
 
-        if g.finished():
+        if g.is_finished():
             break
 
         computer = computer1 if p == 0 or p == 2 else computer2
@@ -355,9 +454,9 @@ def _trained_game(  # noqa: C901
 
     print(f"\n{g.show()}\n")
     print("game over!")
-    if g.win(Tile.X):
+    if g.win(P1):
         print("X won!")
-    elif g.win(Tile.O):
+    elif g.win(P2):
         print("O won!")
     else:
         print("tie!")
@@ -373,17 +472,21 @@ def _many_games(
     o_wins = 0
     ties = 0
     for _ in range(games):
-        while not g.finished():
-            r, c = computer1.choose_action(g.get_state(), exploit=True)
+        while not g.is_finished():
+            r, c = computer1.choose_action(
+                g.immutable_representation(g.state()), exploit=True
+            )
             g.play(r, c)
-            if g.finished():
+            if g.is_finished():
                 break
-            r, c = computer2.choose_action(g.get_state(), exploit=True)
+            r, c = computer2.choose_action(
+                g.immutable_representation(g.state()), exploit=True
+            )
             g.play(r, c)
 
-        if g.win(Tile.X):
+        if g.win(P1):
             x_wins += 1
-        elif g.win(Tile.O):
+        elif g.win(P2):
             o_wins += 1
         else:
             ties += 1

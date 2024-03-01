@@ -18,6 +18,7 @@
 # ttt_mc_trained_game(training_episodes=1000000)
 # ttt_mc_many_games()
 
-from games.tictactoe.ultimate import trained_game
+from games.ultimate_ttt.run import human_game, trained_game
 
+human_game()
 trained_game()

@@ -35,3 +35,11 @@ Both of these methods currently use native python, without any fancy libraries o
 - More [Monte Carlo Tree Search](https://web.archive.org/web/20180629082128/http://mcts.ai/index.html)
 - Original [AlphaZero paper](https://www.nature.com/articles/nature24270.epdf?author_access_token=VJXbVjaSHxFoctQQ4p2k4tRgN0jAjWel9jnR3ZoTv0PVW4gB86EEpGqTRDtpIz-2rmo8-KG06gqVobU5NSCFeHILHcVFUeMsbvwS-lxjqQGg98faovwjxeTUgZAUMnRQ)
 - [Deep Q Learning](https://towardsdatascience.com/how-to-teach-an-ai-to-play-games-deep-reinforcement-learning-28f9b920440a)
+
+## Technical Considerations
+
+### Typing
+
+For bigger projects like these, I'm not a fan of how Python is dynamically typed. Tracking down errors in runtime is frustrating, and sometimes they don't even appear because of how flexible Python syntax can be, so it becomes an obscure bug. Plus, defining types lets me think clearly about the objects I'm handling, as well as the function pre/post-conditions.
+
+However, typing in Python can only go so far. For example, it's tough to enforce the shape and type of values in an NDArray. So when we try to modify a nested value in the array, mypy will think it's an Any type and be unable to check subsequent usages of the nested value. This is especially apparent when implementing game logic that uses numpy arrays extensively. There are some libraries that can mitigate this to some extent, but none are perfect. I can dream about a beautifully statically typed landscape like Haskell but that likely won't happen in Python.

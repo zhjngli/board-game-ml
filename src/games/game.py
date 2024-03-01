@@ -1,26 +1,39 @@
 from abc import ABC, abstractmethod
-from typing import Generic, List, NamedTuple, NewType, TypeVar
+from typing import Generic, List, Literal, TypeVar
 
 from numpy.typing import NDArray
 
 Board = NDArray
-Player = NewType("Player", int)
-P1 = Player(1)
-P2 = Player(-1)
+Player = Literal[1, -1]
+P1: Player = 1
+P2: Player = -1
 
 
-class BasicState(NamedTuple):
-    board: Board
-    player: Player
+class BasicState:
+    """
+    A basic state for 2 player games. Easily extensible with other fields.
+    """
+
+    def __init__(self, board: Board, player: Player) -> None:
+        self.board = board
+        self.player = player
 
 
 State = TypeVar("State", bound=BasicState)
 Action = int
 ImmutableRepresentation = TypeVar("ImmutableRepresentation")  # TODO: enforce hashable
 
+ActionStatus = Literal[1, 0]
+VALID: ActionStatus = 1
+INVAL: ActionStatus = 0
+
 # TODO: new type for certain reward values?
 P1WIN = 1
 P2WIN = -1
+
+
+def switch_player(p: Player) -> Player:
+    return P1 if p == P2 else P2
 
 
 class Game(ABC, Generic[State, ImmutableRepresentation]):
@@ -68,7 +81,7 @@ class Game(ABC, Generic[State, ImmutableRepresentation]):
         pass
 
     @abstractmethod
-    def actions(self, state: State) -> List[int]:
+    def actions(self, state: State) -> List[ActionStatus]:
         """
         Get all the actions available at the given state. 1 represents a valid action and 0 represents invalid.
         """
