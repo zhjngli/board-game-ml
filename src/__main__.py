@@ -18,6 +18,6 @@
 # ttt_mc_trained_game(training_episodes=1000000)
 # ttt_mc_many_games()
 
-from games.ultimate_ttt.run import monte_carlo_trained_game
+from games.ultimate_ttt.run import alpha_zero_trained_game
 
-monte_carlo_trained_game()
+alpha_zero_trained_game()

@@ -1,3 +1,4 @@
+import os
 from typing import Deque, List, Tuple
 
 import numpy as np
@@ -12,7 +13,10 @@ from keras.layers import (  # type: ignore
     Reshape,
 )
 from keras.models import Model  # type: ignore
-from keras.optimizers import Adam  # type: ignore
+
+# from keras.optimizers import Adam  # type: ignore
+# keras 2.11+ optimizer Adam runs slowly on M1/M2, so use legacy
+from keras.optimizers.legacy import Adam  # type: ignore
 from typing_extensions import override
 
 from games.game import P1, P2, VALID
@@ -25,6 +29,8 @@ from games.ultimate_ttt.ultimate import (
     UltimateTicTacToe,
     ir_to_state,
 )
+from learners.alpha_zero.alpha_zero import A0Parameters, AlphaZero
+from learners.alpha_zero.monte_carlo_tree_search import MCTSParameters
 from learners.monte_carlo import MonteCarloLearner
 from learners.trainer import Trainer
 from nn.neural_network import NeuralNetwork, Policy, Value
@@ -194,11 +200,13 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
     BATCH_SIZE = 64
     EPOCHS = 10
 
-    def __init__(self) -> None:
+    def __init__(self, model_folder: str) -> None:
+        self.model_folder = model_folder
         # no 4d conv layer so reshape input to 9x9
         input = Input(
-            shape=(9, 9), name="UltimateBoardInput"
+            shape=(3, 3, 3, 3), name="UltimateBoardInput"
         )  # TODO: batch size? defaults to None I think.
+        print(input.shape)
         # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
         board = Reshape((9, 9, self.NUM_CHANNELS))(input)
         # normalize along channels axis
@@ -243,6 +251,7 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
             loss=["categorical_crossentropy", "mean_squared_error"],
             optimizer=Adam(learning_rate=self.LEARN_RATE),
         )
+        self.model.summary()
 
     def train(self, data: List[Deque[Tuple[UltimateBoard, Policy, Value]]]) -> None:
         input_boards, target_pis, target_vs = list(zip(*data))
@@ -257,13 +266,40 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
         )
 
     def predict(self, state: UltimateState) -> Tuple[Policy, Value]:
-        input = np.reshape(state.board, (9, 9))
-        pis, vs = self.model.predict(input)
+        inputs = np.asarray([state.board])  # array of inputs, so add 1 to the dimension
+        pis, vs = self.model.predict(inputs)
         # TODO: can i choose different predictions here?
         return pis[0], vs[0]
 
-    def save(self, path: str, file: str) -> None:
-        return super().save(path, file)
+    def save(self, file: str) -> None:
+        if not os.path.exists(self.model_folder):
+            print(f"Making directory for models at: {self.model_folder}")
+            os.makedirs(self.model_folder)
+        model_path = os.path.join(self.model_folder, file)
+        self.model.save_weights(model_path)
 
-    def load(self, path: str, file: str) -> None:
-        return super().load(path, file)
+    def load(self, file: str) -> None:
+        model_path = os.path.join(self.model_folder, file)
+        self.model.load_weights(model_path)
+
+
+def alpha_zero_trained_game():
+    a0 = AlphaZero(
+        UltimateTicTacToe(),
+        UltimateNeuralNetwork("src/games/ultimate_ttt/a0_nn_models/"),
+        A0Parameters(
+            temp_threshold=11,
+            pit_games=100,
+            pit_threshold=0.55,
+            training_episodes=100,
+            training_games_per_episode=100,
+            training_queue_length=10,
+            training_hist_max_len=20,
+        ),
+        MCTSParameters(
+            num_searches=40,
+            cpuct=1,
+            epsilon=1e-4,
+        ),
+    )
+    a0.train()

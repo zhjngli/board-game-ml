@@ -43,6 +43,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
         self.epsilon = params.epsilon
 
     def action_probabilities(self, state: State, temperature: float) -> List[float]:
+        # TODO: output NDArray instead of list, might have more optimized calculations?
         for _ in range(self.num_searches):
             self.search(state)
 
@@ -59,9 +60,12 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
             probs[best] = 1
             return probs
 
-        probs = [n ** (1 / temperature) for n in sa_visits]
-        total_probs = sum(probs)
-        return [p / total_probs for p in probs]
+        visits = [n ** (1 / temperature) for n in sa_visits]
+        total_visits = sum(visits)
+        # probability of each action weighted by how many times the state has been visited
+        if total_visits == 0:
+            return [1 / self.game.num_actions()] * self.game.num_actions()
+        return [v / total_visits for v in visits]
 
     def search(self, state: State) -> float:
         ir = self.game.immutable_representation(state)

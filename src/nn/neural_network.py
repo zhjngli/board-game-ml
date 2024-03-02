@@ -19,9 +19,9 @@ class NeuralNetwork(ABC, Generic[State]):
         pass
 
     @abstractmethod
-    def save(self, path: str, file: str) -> None:
+    def save(self, file: str) -> None:
         pass
 
     @abstractmethod
-    def load(self, path: str, file: str) -> None:
+    def load(self, file: str) -> None:
         pass

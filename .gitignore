@@ -1,5 +1,6 @@
-# pickle files from training
+# files from training
 *.pkl
+*.h5
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

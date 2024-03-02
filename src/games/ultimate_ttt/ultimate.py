@@ -123,7 +123,10 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return (sec, loc)
 
     @staticmethod
-    def apply(state: UltimateState, a: Action) -> UltimateState:
+    def apply(s: UltimateState, a: Action) -> UltimateState:
+        state = UltimateState(
+            board=np.copy(s.board), player=s.player, active_nonant=s.active_nonant
+        )
         ((sec), loc) = UltimateTicTacToe.from_action(a)
         (R, C) = sec
         (r, c) = loc
@@ -300,7 +303,8 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         else:
             return TicTacToe.board_array(t)
 
-    def show(self) -> str:
+    @staticmethod
+    def show_board(state: UltimateState) -> str:
         spacing_constant = "            |         |"
         final = [
             "        0         1         2",
@@ -311,7 +315,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
             board_arrays = []
             for c in range(3):
                 board_arrays.append(
-                    UltimateTicTacToe.simplified_ttt_board(self.board[r][c])
+                    UltimateTicTacToe.simplified_ttt_board(state.board[r][c])
                 )
 
             for i in range(len(board_arrays[0])):
@@ -330,6 +334,9 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         final.append(spacing_constant)
         final.append("\n")
         return "\n".join(final)
+
+    def show(self) -> str:
+        return UltimateTicTacToe.show_board(self.state())
 
     @staticmethod
     def num_actions() -> int:
@@ -355,10 +362,12 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return list(actions.reshape(UltimateTicTacToe.num_actions()))
 
     @staticmethod
-    def symmetries(a: NDArray) -> List[NDArray]:
+    def symmetries(b: NDArray) -> List[NDArray]:
         # TODO: test this?
+        # TODO: is reshaping multiple times slow? can optimize by having a separate symmetries function specifically for policy vectors
         syms: List[NDArray] = []
-        b = np.copy(a)
+        input_shape = b.shape
+        b = b.reshape((3, 3, 3, 3))
         for i in range(1, 5):
             for mirror in [True, False]:
                 s = np.rot90(np.rot90(b, i), i, (2, 3))
@@ -366,7 +375,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
                     # only flip along axis 1 and 3, essentially flipping each individual ttt board and the whole board
                     # don't need to flip the other 2 axes since those are covered by rotation and flip
                     s = np.flip(np.flip(s, axis=1), axis=3)
-                syms += s
+                syms.append(s.reshape(input_shape))
         return syms
 
     @staticmethod
@@ -393,6 +402,6 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
             return P2WIN
         elif UltimateTicTacToe._is_board_filled(state.board):
             # TODO: if board is filled, check who won more squares?
-            return 0  # TODO: different value for draws?
+            return 0.1  # TODO: different value for draws?
         else:
             raise RuntimeError(f"Calling reward function when game not ended: {state}")

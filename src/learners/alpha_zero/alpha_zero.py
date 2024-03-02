@@ -44,7 +44,6 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
         nn: NeuralNetwork,
         params: A0Parameters,
         m_params: MCTSParameters,
-        model_path: str,
     ) -> None:
         self.game = game
         self.nn = nn  # current neural network
@@ -53,7 +52,6 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
         self.training_history: List[Deque[Tuple[Board, Policy, float]]] = []
 
         self.m_params = m_params
-        self.model_path = model_path
 
         self.temperature_threshold = params.temp_threshold
         self.pit_games = params.pit_games
@@ -94,30 +92,32 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
 
     def train(self) -> None:
         for i in range(1, self.training_episodes + 1):
-            if i > 1:
-                training_data: Deque[Tuple[Board, Policy, float]] = deque(
-                    [], maxlen=self.training_queue_length
-                )
-                for _ in range(self.training_games_per_episode):
-                    self.m = MonteCarloTreeSearch(self.game, self.nn, self.m_params)
-                    training_data += self.train_once()
+            # self play
+            training_data: Deque[Tuple[Board, Policy, float]] = deque(
+                [], maxlen=self.training_queue_length
+            )
+            for _ in range(self.training_games_per_episode):
+                self.m = MonteCarloTreeSearch(self.game, self.nn, self.m_params)
+                training_data += self.train_once()
 
-                self.training_history.append(training_data)
+            self.training_history.append(training_data)
 
             if len(self.training_history) > self.training_hist_max_len:
                 self.training_history.pop(0)
 
-            self.nn.save(self.model_path, "temp_model.tar")
-            self.pn.load(self.model_path, "temp_model.tar")
+            # train model
+            self.nn.save("temp_model.h5")
+            self.pn.load("temp_model.h5")
 
             shuffle(self.training_history)
             self.nn.train(self.training_history)
 
+            # if model is good enough, keep it
             if self.pit():
-                self.nn.save(self.model_path, f"ep_{i:07d}_model.tar")
-                self.nn.save(self.model_path, "best_model.tar")
+                self.nn.save(f"ep_{i:07d}_model.h5")
+                self.nn.save("best_model.h5")
             else:
-                self.nn.load(self.model_path, "temp_model.tar")
+                self.nn.load("temp_model.h5")
 
     def pit(self) -> bool:
         prev_mtcs = MonteCarloTreeSearch(self.game, self.pn, self.m_params)
