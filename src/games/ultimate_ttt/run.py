@@ -1,4 +1,5 @@
 import os
+import pathlib
 from typing import Deque, List, Tuple
 
 import numpy as np
@@ -206,7 +207,6 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
         input = Input(
             shape=(3, 3, 3, 3), name="UltimateBoardInput"
         )  # TODO: batch size? defaults to None I think.
-        print(input.shape)
         # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
         board = Reshape((9, 9, self.NUM_CHANNELS))(input)
         # normalize along channels axis
@@ -286,7 +286,9 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
 def alpha_zero_trained_game():
     a0 = AlphaZero(
         UltimateTicTacToe(),
-        UltimateNeuralNetwork("src/games/ultimate_ttt/a0_nn_models/"),
+        UltimateNeuralNetwork(
+            model_folder=f"{pathlib.Path(__file__).parent.resolve()}/a0_nn_models/"
+        ),
         A0Parameters(
             temp_threshold=11,
             pit_games=100,
