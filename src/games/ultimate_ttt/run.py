@@ -1,19 +1,33 @@
-from typing import List, Tuple
+from typing import Deque, List, Tuple
 
+import numpy as np
+from keras.layers import (  # type: ignore
+    Activation,
+    BatchNormalization,
+    Conv2D,
+    Dense,
+    Dropout,
+    Flatten,
+    Input,
+    Reshape,
+)
+from keras.models import Model  # type: ignore
+from keras.optimizers import Adam  # type: ignore
 from typing_extensions import override
 
-from games.game import P1, P2
-from games.tictactoe.tictactoe import Empty
+from games.game import P1, P2, VALID
 from games.ultimate_ttt.ultimate import (
-    FinishedTTTState,
     Location,
     Section,
+    UltimateBoard,
     UltimateIR,
+    UltimateState,
     UltimateTicTacToe,
     ir_to_state,
 )
 from learners.monte_carlo import MonteCarloLearner
 from learners.trainer import Trainer
+from nn.neural_network import NeuralNetwork, Policy, Value
 
 
 def human_game() -> None:
@@ -128,36 +142,12 @@ class UltimateMonteCarloLearner(
     def get_actions_from_state(
         self, state: UltimateIR
     ) -> List[Tuple[Section, Location]]:
-        if state.active_nonant is not None:
-            (R, C) = state.active_nonant
-            ttt_state = state.board[R][C]
-            if (
-                ttt_state != FinishedTTTState.Tie
-                and ttt_state != FinishedTTTState.XWin
-                and ttt_state != FinishedTTTState.OWin
-            ):
-                return [
-                    ((R, C), (r, c))
-                    for r in range(3)
-                    for c in range(3)
-                    if ttt_state[r][c] == Empty
-                ]
-
-        actions = []
-        for R in range(3):
-            for C in range(3):
-                ttt_state = state.board[R][C]
-                for r in range(3):
-                    for c in range(3):
-                        if (
-                            ttt_state != FinishedTTTState.Tie
-                            and ttt_state != FinishedTTTState.XWin
-                            and ttt_state != FinishedTTTState.OWin
-                        ):
-                            if ttt_state[r][c] == Empty:
-                                actions.append(((R, C), (r, c)))
-
-        return actions
+        valid_actions = UltimateTicTacToe.actions(ir_to_state(state))
+        return [
+            UltimateTicTacToe.from_action(a)
+            for a in range(len(valid_actions))
+            if valid_actions[a] == VALID
+        ]
 
     def apply(self, ir: UltimateIR, action: Tuple[Section, Location]) -> UltimateIR:
         (sec, loc) = action
@@ -170,7 +160,7 @@ MCP1_POLICY = "src/games/ultimate_ttt/mcp1.pkl"
 MCP2_POLICY = "src/games/ultimate_ttt/mcp2.pkl"
 
 
-def trained_game():
+def monte_carlo_trained_game():
     computer1 = UltimateMonteCarloLearner(policy_file=MCP1_POLICY)
     computer2 = UltimateMonteCarloLearner(policy_file=MCP2_POLICY)
     g = UltimateMonteCarloTrainer(p1=computer1, p2=computer2)
@@ -195,3 +185,85 @@ def trained_game():
 
     print(g.show())
     print("\ngame over!")
+
+
+class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
+    NUM_CHANNELS = 1
+    DROPOUT_RATE = 0.3
+    LEARN_RATE = 0.01
+    BATCH_SIZE = 64
+    EPOCHS = 10
+
+    def __init__(self) -> None:
+        # no 4d conv layer so reshape input to 9x9
+        input = Input(
+            shape=(9, 9), name="UltimateBoardInput"
+        )  # TODO: batch size? defaults to None I think.
+        # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
+        board = Reshape((9, 9, self.NUM_CHANNELS))(input)
+        # normalize along channels axis
+        conv1 = Activation("relu")(
+            BatchNormalization(axis=3)(
+                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(3, 3), padding="valid")(
+                    board
+                )
+            )
+        )
+        conv2 = Activation("relu")(
+            BatchNormalization(axis=3)(
+                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(3, 3), padding="valid")(
+                    conv1
+                )
+            )
+        )
+        conv3 = Activation("relu")(
+            BatchNormalization(axis=3)(
+                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(3, 3), padding="valid")(
+                    conv2
+                )
+            )
+        )
+        flat = Flatten()(conv3)
+        dense1 = Dropout(rate=self.DROPOUT_RATE)(
+            Activation("relu")(BatchNormalization(axis=1)(Dense(1024)(flat)))
+        )
+        dense2 = Dropout(rate=self.DROPOUT_RATE)(
+            Activation("relu")(BatchNormalization(axis=1)(Dense(512)(dense1)))
+        )
+
+        # policy, guessing the value of each valid action at the input state
+        pi = Dense(UltimateTicTacToe.num_actions(), activation="softmax", name="pi")(
+            dense2
+        )
+        # value, guessing the value of the input state
+        v = Dense(1, activation="tanh", name="v")(dense2)
+
+        self.model = Model(inputs=input, outputs=[pi, v])
+        self.model.compile(
+            loss=["categorical_crossentropy", "mean_squared_error"],
+            optimizer=Adam(learning_rate=self.LEARN_RATE),
+        )
+
+    def train(self, data: List[Deque[Tuple[UltimateBoard, Policy, Value]]]) -> None:
+        input_boards, target_pis, target_vs = list(zip(*data))
+        input_boards = np.asarray(input_boards)
+        target_pis = np.asarray(target_pis)
+        target_vs = np.asarray(target_vs)
+        self.model.fit(
+            x=input_boards,
+            y=[target_pis, target_vs],
+            batch_size=self.BATCH_SIZE,
+            epochs=self.EPOCHS,
+        )
+
+    def predict(self, state: UltimateState) -> Tuple[Policy, Value]:
+        input = np.reshape(state.board, (9, 9))
+        pis, vs = self.model.predict(input)
+        # TODO: can i choose different predictions here?
+        return pis[0], vs[0]
+
+    def save(self, path: str, file: str) -> None:
+        return super().save(path, file)
+
+    def load(self, path: str, file: str) -> None:
+        return super().load(path, file)

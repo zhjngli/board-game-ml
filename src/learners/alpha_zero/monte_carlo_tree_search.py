@@ -22,24 +22,18 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
         nn: NeuralNetwork,
         params: MCTSParameters,
     ) -> None:
-        self.q: Dict[Tuple[ImmutableRepresentation, Action], float] = (
-            {}
-        )  # q values for state-action pair
-        self.nsa: Dict[Tuple[ImmutableRepresentation, Action], int] = (
-            {}
-        )  # number of times state-action pair was visited
-        self.ns: Dict[ImmutableRepresentation, int] = (
-            {}
-        )  # number of times state was visited
-        self.evs: Dict[ImmutableRepresentation, float] = (
-            {}
-        )  # value at game end, or 0 if the game is not finished yet
-        self.vas: Dict[ImmutableRepresentation, List[ActionStatus]] = (
-            {}
-        )  # valid actions at a game state
-        self.ps: Dict[ImmutableRepresentation, NDArray] = (
-            {}
-        )  # the action policies at a game state
+        # q values for state-action pair
+        self.q: Dict[Tuple[ImmutableRepresentation, Action], float] = {}
+        # number of times state-action pair was visited
+        self.nsa: Dict[Tuple[ImmutableRepresentation, Action], int] = {}
+        # number of times state was visited
+        self.ns: Dict[ImmutableRepresentation, int] = {}
+        # value at game end, or 0 if the game is not finished yet
+        self.evs: Dict[ImmutableRepresentation, float] = {}
+        # valid actions at a game state
+        self.vas: Dict[ImmutableRepresentation, List[ActionStatus]] = {}
+        # the action policies at a game state
+        self.ps: Dict[ImmutableRepresentation, NDArray] = {}
 
         self.game = game
         self.nn = nn

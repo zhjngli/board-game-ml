@@ -11,7 +11,7 @@ Value = float
 
 class NeuralNetwork(ABC, Generic[State]):
     @abstractmethod
-    def train(self, data: List[Deque[Tuple[Board, Policy, float]]]):
+    def train(self, data: List[Deque[Tuple[Board, Policy, Value]]]) -> None:
         pass
 
     @abstractmethod
