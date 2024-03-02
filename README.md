@@ -11,15 +11,16 @@ All policy files are saved locally, so cloning the repo fresh will require train
 ### ML methods
 
 - Simple [Q-learning](src/learners/q.py), which attempts to track the whole q-table. As opposed to deep q-learning which uses a neural network to guess the best possible action given a state. Works well when rewards can be calculated per action.
-- [Monte carlo](src/learners/monte_carlo.py) learning. Works for episodic rewards, where the value of each state/action is primarily determined after the game is complete.
+- [Monte carlo](src/learners/monte_carlo.py) learning. Works for episodic rewards, where the value of each state/action is primarily determined after the game is complete. Stores all the states that it's explored, and the associated value of each state.
+- [Alpha Zero](src/learners/alpha_zero/). Combines a neural network with monte carlo tree search so that the training is more optimized. Only needs to store the neural network weights (and self-play training examples, if preferred), so it's much more memory efficient than storing all the explored states.
 
 Both of these methods currently use native python, without any fancy libraries or frameworks. It's inefficient, but forces me to consider the details.
 
 ### Games
-- A [random walk game](src/random_walk/random_walk.py) which scores points at the right bound and loses points at the left bound. This is trained with q-learning and a monte carlo method.
-- [Tic-tac-toe](src/tictactoe/tictactoe.py). This game can be successfully trained using the monte carlo learning method.
-- [Digit party](src/digit_party/digit_party.py). Though naive q-learning should be able to learn this game, it is intractable as the number of states is just too high. Deep q-learning should work better.
-- [Ultimate tic tac toe](https://en.wikipedia.org/wiki/Ultimate_tic-tac-toe). Works ok with simple Monte Carlo method but hopefully better with Alpha Zero.
+- A [random walk game](src/games/random_walk/random_walk.py) which scores points at the right bound and loses points at the left bound. This is trained with q-learning and a monte carlo method.
+- [Tic-tac-toe](src/games/tictactoe/tictactoe.py). This game can be successfully trained using the monte carlo learning method.
+- [Digit party](src/games/digit_party/digit_party.py). Though naive q-learning should be able to learn this game, it is intractable as the number of states is just too high. Deep q-learning should work better.
+- [Ultimate tic tac toe](src/games/ultimate_ttt/ultimate.py). Works ok with simple Monte Carlo method but even better with Alpha Zero.
 
 ### TODO
 
