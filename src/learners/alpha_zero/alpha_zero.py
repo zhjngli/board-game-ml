@@ -93,14 +93,14 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
     def train(self) -> None:
         for i in range(1, self.training_episodes + 1):
             # self play
-            training_data: Deque[Tuple[Board, Policy, float]] = deque(
+            self_play_data: Deque[Tuple[Board, Policy, float]] = deque(
                 [], maxlen=self.training_queue_length
             )
             for _ in range(self.training_games_per_episode):
                 self.m = MonteCarloTreeSearch(self.game, self.nn, self.m_params)
-                training_data += self.train_once()
+                self_play_data.extend(self.train_once())
 
-            self.training_history.append(training_data)
+            self.training_history.append(self_play_data)
 
             if len(self.training_history) > self.training_hist_max_len:
                 self.training_history.pop(0)
@@ -109,8 +109,11 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
             self.nn.save("temp_model.h5")
             self.pn.load("temp_model.h5")
 
-            shuffle(self.training_history)
-            self.nn.train(self.training_history)
+            training_data = [
+                d for game_data in self.training_history for d in game_data
+            ]
+            shuffle(training_data)
+            self.nn.train(training_data)
 
             # if model is good enough, keep it
             if self.pit():

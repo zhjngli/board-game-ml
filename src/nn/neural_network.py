@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Deque, Generic, List, Tuple
+from typing import Generic, List, Tuple
 
 from numpy.typing import NDArray
 
@@ -11,7 +11,7 @@ Value = float
 
 class NeuralNetwork(ABC, Generic[State]):
     @abstractmethod
-    def train(self, data: List[Deque[Tuple[Board, Policy, Value]]]) -> None:
+    def train(self, data: List[Tuple[Board, Policy, Value]]) -> None:
         pass
 
     @abstractmethod

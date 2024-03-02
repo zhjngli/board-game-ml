@@ -1,6 +1,6 @@
 import os
 import pathlib
-from typing import Deque, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 from keras.layers import (  # type: ignore
@@ -253,7 +253,7 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
         )
         self.model.summary()
 
-    def train(self, data: List[Deque[Tuple[UltimateBoard, Policy, Value]]]) -> None:
+    def train(self, data: List[Tuple[UltimateBoard, Policy, Value]]) -> None:
         input_boards, target_pis, target_vs = list(zip(*data))
         input_boards = np.asarray(input_boards)
         target_pis = np.asarray(target_pis)
@@ -291,11 +291,11 @@ def alpha_zero_trained_game():
         ),
         A0Parameters(
             temp_threshold=11,
-            pit_games=100,
+            pit_games=20,
             pit_threshold=0.55,
             training_episodes=100,
-            training_games_per_episode=100,
-            training_queue_length=10,
+            training_games_per_episode=10,
+            training_queue_length=100,
             training_hist_max_len=20,
         ),
         MCTSParameters(
