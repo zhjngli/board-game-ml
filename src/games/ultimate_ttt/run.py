@@ -202,7 +202,8 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
     EPOCHS = 10
 
     def __init__(self, model_folder: str) -> None:
-        self.model_folder = model_folder
+        super().__init__(model_folder)
+
         # no 4d conv layer so reshape input to 9x9
         input = Input(
             shape=(3, 3, 3, 3), name="UltimateBoardInput"
@@ -284,11 +285,10 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
 
 
 def alpha_zero_trained_game():
+    cur_dir = pathlib.Path(__file__).parent.resolve()
     a0 = AlphaZero(
         UltimateTicTacToe(),
-        UltimateNeuralNetwork(
-            model_folder=f"{pathlib.Path(__file__).parent.resolve()}/a0_nn_models/"
-        ),
+        UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
         A0Parameters(
             temp_threshold=11,
             pit_games=20,
@@ -299,9 +299,10 @@ def alpha_zero_trained_game():
             training_hist_max_len=20,
         ),
         MCTSParameters(
-            num_searches=40,
+            num_searches=100,
             cpuct=1,
             epsilon=1e-4,
         ),
+        training_examples_folder=f"{cur_dir}/a0_training_examples/",
     )
     a0.train()

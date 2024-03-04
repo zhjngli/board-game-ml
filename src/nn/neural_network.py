@@ -10,6 +10,9 @@ Value = float
 
 
 class NeuralNetwork(ABC, Generic[State]):
+    def __init__(self, model_folder: str) -> None:
+        self.model_folder = model_folder
+
     @abstractmethod
     def train(self, data: List[Tuple[Board, Policy, Value]]) -> None:
         pass

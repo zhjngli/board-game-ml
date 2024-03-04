@@ -1,3 +1,5 @@
+import os
+import pickle
 from abc import ABC
 from collections import deque
 from random import shuffle
@@ -20,7 +22,7 @@ from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
 )
-from nn.neural_network import NeuralNetwork, Policy
+from nn.neural_network import NeuralNetwork, Policy, Value
 
 
 class A0Parameters(NamedTuple):
@@ -33,6 +35,10 @@ class A0Parameters(NamedTuple):
     training_hist_max_len: int
 
 
+# TODO: training data should really be a tuple of neural network inputs and outputs.
+# in the current scheme, (Board, Policy, Value), only captures the type of games s.t.
+# the neural network input is the board, and the output is the policy and value.
+# Other games can potentially have other input that's not fully captured in the board.
 class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
     """
     Combines a neural network with Monte Carlo Tree Search to increase training efficiency and reduce memory required for training.
@@ -44,12 +50,14 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
         nn: NeuralNetwork,
         params: A0Parameters,
         m_params: MCTSParameters,
+        training_examples_folder: str,
     ) -> None:
         self.game = game
         self.nn = nn  # current neural network
         self.pn = nn  # previous neural network for self-play. TODO: some other form of previous?
         self.m = MonteCarloTreeSearch(self.game, self.nn, m_params)
-        self.training_history: List[Deque[Tuple[Board, Policy, float]]] = []
+        self.training_history: List[Deque[Tuple[Board, Policy, Value]]] = []
+        self.training_examples_folder = training_examples_folder
 
         self.m_params = m_params
 
@@ -61,10 +69,10 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
         self.training_queue_length = params.training_queue_length
         self.training_hist_max_len = params.training_hist_max_len
 
-    def train_once(self) -> List[Tuple[Board, Policy, float]]:
+    def train_once(self) -> List[Tuple[Board, Policy, Value]]:
         self.game.reset()
 
-        training_data: List[Tuple[Board, Player, Policy, Optional[float]]] = []
+        training_data: List[Tuple[Board, Player, Policy, Optional[Value]]] = []
         state = self.game.state()
         player = state.player
 
@@ -91,9 +99,11 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
         ]
 
     def train(self) -> None:
-        for i in range(1, self.training_episodes + 1):
+        last_ep = self.load_latest_model()
+
+        for i in range(last_ep + 1, self.training_episodes + 1):
             # self play
-            self_play_data: Deque[Tuple[Board, Policy, float]] = deque(
+            self_play_data: Deque[Tuple[Board, Policy, Value]] = deque(
                 [], maxlen=self.training_queue_length
             )
             for _ in range(self.training_games_per_episode):
@@ -104,6 +114,9 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
 
             if len(self.training_history) > self.training_hist_max_len:
                 self.training_history.pop(0)
+
+            # i-1: last episode's model played these games
+            self.save_training_history(f"training_examples_{i-1:07d}.pkl")
 
             # train model
             self.nn.save("temp_model.h5")
@@ -167,3 +180,37 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
         # TODO: should win percentage be based on total games?
         # candidate becomes p1 after the switch
         return p1wins + p2wins != 0 and p1wins / (p1wins + p2wins) > self.pit_threshold
+
+    def save_training_history(self, file: str) -> None:
+        if not os.path.exists(self.training_examples_folder):
+            print(
+                f"Making directory for training examples at: {self.training_examples_folder}"
+            )
+            os.makedirs(self.training_examples_folder)
+
+        training_examples_path = os.path.join(self.training_examples_folder, file)
+        with open(training_examples_path, "wb") as f:
+            pickle.dump(self.training_history, f)
+
+    def load_latest_model(self) -> int:
+        """
+        Loads latest model and returns latest training episode if training stops for whatever reason.
+        """
+        iteration = 1
+        latest_model = None
+        for filename in os.listdir(self.nn.model_folder):
+            f = os.path.join(self.nn.model_folder, filename)
+            if os.path.isfile(f):
+                try:
+                    i = int(filename.split("_")[1])  # ep_0001_model.h5
+                except ValueError:
+                    # best_model.h5 or temp_model.h5
+                    continue
+                if i >= iteration:
+                    iteration = i
+                    latest_model = f
+
+        if latest_model:
+            self.nn.load(latest_model)
+            self.pn.load(latest_model)  # TODO: some other form of previous model?
+        return i
