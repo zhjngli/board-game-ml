@@ -322,64 +322,64 @@ class TicTacToeMonteCarloLearner(MonteCarloLearner[TicTacToeIR, Tuple[int, int]]
         return TicTacToe.applyIR(state, a)
 
 
-class TicTacToeQTrainer(TicTacToe, Trainer):
-    def __init__(self, p1: SimpleQLearner, p2: SimpleQLearner) -> None:
-        super().__init__()
-        self.p1 = p1
-        self.p2 = p2
+# class TicTacToeQTrainer(TicTacToe, Trainer):
+#     def __init__(self, p1: SimpleQLearner, p2: SimpleQLearner) -> None:
+#         super().__init__()
+#         self.p1 = p1
+#         self.p2 = p2
 
-    @override
-    def train(self, episodes=10000) -> None:
-        super().train(episodes)
+#     @override
+#     def train(self, episodes=10000) -> None:
+#         super().train(episodes)
 
-        self.p1.save_policy()
-        self.p2.save_policy()
+#         self.p1.save_policy()
+#         self.p2.save_policy()
 
-    # TODO: this training is pretty dumb, doesn't work well
-    def train_once(self) -> None:
-        while not self.is_finished():
-            ir = self.immutable_of(self.state())
-            action = self.p1.choose_action(ir)
-            r, c = action
-            self.play1(r, c)
+#     # TODO: this training is pretty dumb, doesn't work well
+#     def train_once(self) -> None:
+#         while not self.is_finished():
+#             ir = self.immutable_of(self.state())
+#             action = self.p1.choose_action(ir)
+#             r, c = action
+#             self.play1(r, c)
 
-            if self.is_finished():
-                break
+#             if self.is_finished():
+#                 break
 
-            ir = self.immutable_of(self.state())
-            action = self.p2.choose_action(ir)
-            r, c = action
-            self.play2(r, c)
+#             ir = self.immutable_of(self.state())
+#             action = self.p2.choose_action(ir)
+#             r, c = action
+#             self.play2(r, c)
 
-        if self.win(P1):
-            self.p1.update_q_value(ir, action, 1, self.immutable_of(self.state()))
-            self.p2.update_q_value(ir, action, -1, self.immutable_of(self.state()))
-        elif self.win(P2):
-            self.p1.update_q_value(ir, action, -1, self.immutable_of(self.state()))
-            self.p2.update_q_value(ir, action, 1, self.immutable_of(self.state()))
-        elif self.board_filled():
-            self.p1.update_q_value(ir, action, -0.1, self.immutable_of(self.state()))
-            self.p2.update_q_value(ir, action, 0, self.immutable_of(self.state()))
-        else:
-            raise Exception("giving rewards when game's not over. something's wrong!")
-        self.reset()
-
-
-class TicTacToeQLearner(SimpleQLearner[TicTacToeIR, Tuple[int, int]]):
-    def default_action_q_values(self) -> dict[Tuple[int, int], float]:
-        actions = {}
-        for r in range(3):
-            for c in range(3):
-                actions[(r, c)] = 0.0
-        return actions
-
-    def get_actions_from_state(self, state: TicTacToeIR) -> List[Tuple[int, int]]:
-        return [
-            (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Empty
-        ]
+#         if self.win(P1):
+#             self.p1.update_q_value(ir, action, 1, self.immutable_of(self.state()))
+#             self.p2.update_q_value(ir, action, -1, self.immutable_of(self.state()))
+#         elif self.win(P2):
+#             self.p1.update_q_value(ir, action, -1, self.immutable_of(self.state()))
+#             self.p2.update_q_value(ir, action, 1, self.immutable_of(self.state()))
+#         elif self.board_filled():
+#             self.p1.update_q_value(ir, action, -0.1, self.immutable_of(self.state()))
+#             self.p2.update_q_value(ir, action, 0, self.immutable_of(self.state()))
+#         else:
+#             raise Exception("giving rewards when game's not over. something's wrong!")
+#         self.reset()
 
 
-def _computer_play(g: TicTacToe, p: TicTacToeMonteCarloLearner | TicTacToeQLearner):
+# class TicTacToeQLearner(SimpleQLearner[TicTacToeIR, Tuple[int, int]]):
+#     def default_action_q_values(self) -> dict[Tuple[int, int], float]:
+#         actions = {}
+#         for r in range(3):
+#             for c in range(3):
+#                 actions[(r, c)] = 0.0
+#         return actions
+
+#     def get_actions_from_state(self, state: TicTacToeIR) -> List[Tuple[int, int]]:
+#         return [
+#             (i, j) for i in range(3) for j in range(3) if state.board[i][j] == Empty
+#         ]
+
+
+def _computer_play(g: TicTacToe, p: TicTacToeMonteCarloLearner):
     print(f"\n{g.show()}\n")
     r, c = p.choose_action(g.immutable_of(g.state()), exploit=True)
     g.play(r, c)
@@ -405,8 +405,8 @@ def _human_play(g: TicTacToe):
 
 def _trained_game(  # noqa: C901
     g: TicTacToe,
-    computer1: TicTacToeMonteCarloLearner | TicTacToeQLearner,
-    computer2: TicTacToeMonteCarloLearner | TicTacToeQLearner,
+    computer1: TicTacToeMonteCarloLearner,
+    computer2: TicTacToeMonteCarloLearner,
 ):
     player = input(
         "play as player 1 or 2? or choose 0 to spectate computers play. "
@@ -452,8 +452,8 @@ def _trained_game(  # noqa: C901
 
 def _many_games(
     g: TicTacToe,
-    computer1: TicTacToeMonteCarloLearner | TicTacToeQLearner,
-    computer2: TicTacToeMonteCarloLearner | TicTacToeQLearner,
+    computer1: TicTacToeMonteCarloLearner,
+    computer2: TicTacToeMonteCarloLearner,
     games: int,
 ):
     x_wins = 0
@@ -503,22 +503,22 @@ def monte_carlo_many_games(games=10000):
     _many_games(g, computer1, computer2, games)
 
 
-QP1_POLICY = "src/games/tictactoe/qp1.pkl"
-QP2_POLICY = "src/games/tictactoe/qp2.pkl"
+# QP1_POLICY = "src/games/tictactoe/qp1.pkl"
+# QP2_POLICY = "src/games/tictactoe/qp2.pkl"
 
 
-def q_trained_game(training_episodes=0):
-    computer1 = TicTacToeQLearner(q_pickle=QP1_POLICY)
-    computer2 = TicTacToeQLearner(q_pickle=QP2_POLICY)
-    g = TicTacToeQTrainer(p1=computer1, p2=computer2)
-    g.train(episodes=training_episodes)
+# def q_trained_game(training_episodes=0):
+#     computer1 = TicTacToeQLearner(q_pickle=QP1_POLICY)
+#     computer2 = TicTacToeQLearner(q_pickle=QP2_POLICY)
+#     g = TicTacToeQTrainer(p1=computer1, p2=computer2)
+#     g.train(episodes=training_episodes)
 
-    _trained_game(g, computer1, computer2)
+#     _trained_game(g, computer1, computer2)
 
 
-def q_many_games(games=10000):
-    computer1 = TicTacToeQLearner(q_pickle=QP1_POLICY)
-    computer2 = TicTacToeQLearner(q_pickle=QP2_POLICY)
-    g = TicTacToeQTrainer(p1=computer1, p2=computer2)
+# def q_many_games(games=10000):
+#     computer1 = TicTacToeQLearner(q_pickle=QP1_POLICY)
+#     computer2 = TicTacToeQLearner(q_pickle=QP2_POLICY)
+#     g = TicTacToeQTrainer(p1=computer1, p2=computer2)
 
-    _many_games(g, computer1, computer2, games)
+#     _many_games(g, computer1, computer2, games)

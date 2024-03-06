@@ -1,6 +1,5 @@
 import os
 import pickle
-from abc import ABC
 from collections import deque
 from random import shuffle
 from typing import Callable, Deque, Generic, List, NamedTuple, Optional, Tuple
@@ -14,7 +13,7 @@ from games.game import (
     Action,
     Board,
     Game,
-    ImmutableRepresentation,
+    Immutable,
     Player,
     State,
 )
@@ -39,14 +38,14 @@ class A0Parameters(NamedTuple):
 # in the current scheme, (Board, Policy, Value), only captures the type of games s.t.
 # the neural network input is the board, and the output is the policy and value.
 # Other games can potentially have other input that's not fully captured in the board.
-class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
+class AlphaZero(Generic[State, Immutable]):
     """
     Combines a neural network with Monte Carlo Tree Search to increase training efficiency and reduce memory required for training.
     """
 
     def __init__(
         self,
-        game: Game[State, ImmutableRepresentation],
+        game: Game[State, Immutable],
         nn: NeuralNetwork,
         params: A0Parameters,
         m_params: MCTSParameters,

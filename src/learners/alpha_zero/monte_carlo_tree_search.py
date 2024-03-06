@@ -5,7 +5,7 @@ from typing import Dict, Generic, List, NamedTuple, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from games.game import Action, ActionStatus, Game, ImmutableRepresentation, State
+from games.game import Action, ActionStatus, Game, Immutable, State
 from nn.neural_network import NeuralNetwork
 
 
@@ -15,25 +15,25 @@ class MCTSParameters(NamedTuple):
     epsilon: float
 
 
-class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
+class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
     def __init__(
         self,
-        game: Game[State, ImmutableRepresentation],
+        game: Game[State, Immutable],
         nn: NeuralNetwork,
         params: MCTSParameters,
     ) -> None:
         # q values for state-action pair
-        self.q: Dict[Tuple[ImmutableRepresentation, Action], float] = {}
+        self.q: Dict[Tuple[Immutable, Action], float] = {}
         # number of times state-action pair was visited
-        self.nsa: Dict[Tuple[ImmutableRepresentation, Action], int] = {}
+        self.nsa: Dict[Tuple[Immutable, Action], int] = {}
         # number of times state was visited
-        self.ns: Dict[ImmutableRepresentation, int] = {}
+        self.ns: Dict[Immutable, int] = {}
         # value at game end, or 0 if the game is not finished yet
-        self.evs: Dict[ImmutableRepresentation, float] = {}
+        self.evs: Dict[Immutable, float] = {}
         # valid actions at a game state
-        self.vas: Dict[ImmutableRepresentation, List[ActionStatus]] = {}
+        self.vas: Dict[Immutable, List[ActionStatus]] = {}
         # the action policies at a game state
-        self.ps: Dict[ImmutableRepresentation, NDArray] = {}
+        self.ps: Dict[Immutable, NDArray] = {}
 
         self.game = game
         self.nn = nn
@@ -47,7 +47,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
         for _ in range(self.num_searches):
             self.search(state)
 
-        ir: ImmutableRepresentation = self.game.immutable_of(state)
+        ir: Immutable = self.game.immutable_of(state)
         sa_visits = [
             self.nsa[(ir, a)] if (ir, a) in self.nsa else 0
             for a in range(self.game.num_actions())
