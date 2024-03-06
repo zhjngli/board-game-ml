@@ -187,8 +187,8 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
     @staticmethod
     def actions(state: TicTacToeState) -> List[ActionStatus]:
         b = np.copy(state.board)
-        b[b != Empty] = 0
         b[b == Empty] = 1
+        b[b != Empty] = 0
         return list(b.reshape(TicTacToe.num_actions()))
 
     @staticmethod

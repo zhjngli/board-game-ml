@@ -1,8 +1,6 @@
-# from games.digit_party.digit_party import human_game as digit_party_human_game
-# from games.digit_party.digit_party import (
-#     many_trained_games as digit_party_many_trained_games,
-# )
-# from games.digit_party.digit_party import trained_game as digit_party_trained_game
+# from games.digit_party.run import human_game as digit_party_human_game
+# from games.digit_party.run import many_trained_games as digit_party_many_trained_games
+# from games.digit_party.run import trained_game as digit_party_trained_game
 
 # digit_party_human_game()
 # digit_party_trained_game(game_size=3)
