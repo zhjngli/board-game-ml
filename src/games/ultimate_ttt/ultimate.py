@@ -144,7 +144,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
             )
 
         section: NDArray = state.board[R][C]
-        if TicTacToe.finished(TicTacToeState(board=section, player=state.player)):
+        if TicTacToe.check_finished(TicTacToeState(board=section, player=state.player)):
             raise ValueError(
                 f"Section {R, C} is finished, cannot apply {action} (from {a})."
             )
@@ -163,7 +163,9 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
 
         player = switch_player(state.player)
 
-        if TicTacToe.finished(TicTacToeState(board=state.board[loc], player=player)):
+        if TicTacToe.check_finished(
+            TicTacToeState(board=state.board[loc], player=player)
+        ):
             active_nonant = None
         else:
             active_nonant = loc
@@ -200,7 +202,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         for row in board:
             for b in row:
                 s = TicTacToeState(board=b, player=P1)
-                if not TicTacToe.finished(s):
+                if not TicTacToe.check_finished(s):
                     return False
         return True
 
@@ -208,7 +210,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return self._is_board_filled(self.board)
 
     @staticmethod
-    def finished(state: UltimateState) -> bool:
+    def check_finished(state: UltimateState) -> bool:
         board = state.board
         xWin = UltimateTicTacToe._is_win(P1, board)
         oWin = UltimateTicTacToe._is_win(P2, board)
@@ -216,7 +218,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return xWin or oWin or UltimateTicTacToe._is_board_filled(board)
 
     def is_finished(self) -> bool:
-        return UltimateTicTacToe.finished(self.state())
+        return UltimateTicTacToe.check_finished(self.state())
 
     @staticmethod
     def simplified_ttt_ir(t: TTTBoard) -> SimplifiedTTTIR:
@@ -227,9 +229,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         elif TicTacToe._is_board_filled(t):
             return FinishedTTTState.Tie
         else:
-            return TicTacToe.immutable_representation(
-                TicTacToeState(board=t, player=P1)
-            ).board
+            return TicTacToe.immutable_of(TicTacToeState(board=t, player=P1)).board
 
     @staticmethod
     def get_board_rep(board: UltimateBoard) -> UltimateBoardIR:
@@ -291,7 +291,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
                 " O   O ",
                 "  OOO  ",
             ]
-        elif TicTacToe.finished(TicTacToeState(board=t, player=P1)):
+        elif TicTacToe.check_finished(TicTacToeState(board=t, player=P1)):
             return [
                 "- - - -",
                 " - - - ",
@@ -351,7 +351,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
                     # if active_nonant, only that subboard has potentially valid spots
                     continue
                 b = state.board[R][C]
-                if TicTacToe.finished(TicTacToeState(board=b, player=P1)):
+                if TicTacToe.check_finished(TicTacToeState(board=b, player=P1)):
                     # any subboard that is finished is invalid
                     continue
                 for r in range(3):
@@ -362,7 +362,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return list(actions.reshape(UltimateTicTacToe.num_actions()))
 
     @staticmethod
-    def symmetries(b: NDArray) -> List[NDArray]:
+    def symmetries_of(b: NDArray) -> List[NDArray]:
         # TODO: test this?
         # TODO: is reshaping multiple times slow? can optimize by having a separate symmetries function specifically for policy vectors
         syms: List[NDArray] = []
@@ -379,7 +379,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return syms
 
     @staticmethod
-    def immutable_representation(state: UltimateState) -> UltimateIR:
+    def immutable_of(state: UltimateState) -> UltimateIR:
         return UltimateIR(
             board=UltimateTicTacToe.get_board_rep(state.board),
             player=state.player,
@@ -387,7 +387,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         )
 
     @staticmethod
-    def oriented_state(state: UltimateState) -> UltimateState:
+    def orient_state(state: UltimateState) -> UltimateState:
         return UltimateState(
             board=state.board * state.player,
             player=P1,
@@ -395,7 +395,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         )
 
     @staticmethod
-    def reward(state: UltimateState) -> float:
+    def calculate_reward(state: UltimateState) -> float:
         if UltimateTicTacToe._is_win(P1, state.board):
             return P1WIN
         elif UltimateTicTacToe._is_win(P2, state.board):

@@ -173,7 +173,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         return not self.digits and len(self.placements) == self.n * self.n
 
     @staticmethod
-    def finished(state: DigitPartyState) -> bool:
+    def check_finished(state: DigitPartyState) -> bool:
         return bool(np.all([state != 0]))
 
     def _intersperse_board(self) -> List[List[Digit | str]]:
@@ -277,7 +277,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             return None, None
 
     @staticmethod
-    def immutable_representation(state: DigitPartyState) -> DigitPartyIR:
+    def immutable_of(state: DigitPartyState) -> DigitPartyIR:
         return DigitPartyIR(
             board=tuple(tuple(row) for row in state.board), next=state.next
         )
@@ -292,7 +292,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         )
 
     @staticmethod
-    def oriented_state(state: DigitPartyState) -> DigitPartyState:
+    def orient_state(state: DigitPartyState) -> DigitPartyState:
         # DigitParty is single player, no need to orient it
         return state
 
@@ -307,7 +307,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         return self.n * self.n
 
     @staticmethod
-    def symmetries(a: NDArray) -> List[NDArray]:
+    def symmetries_of(a: NDArray) -> List[NDArray]:
         syms: List[NDArray] = []
         b = np.copy(a)
         for i in range(1, 5):
@@ -319,6 +319,6 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         return syms
 
     @staticmethod
-    def reward(state: DigitPartyState) -> float:
+    def calculate_reward(state: DigitPartyState) -> float:
         # TODO: should this be difference between current score and previous score?
         return state.score

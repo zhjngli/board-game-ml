@@ -105,20 +105,16 @@ class UltimateMonteCarloTrainer(UltimateTicTacToe, Trainer):
 
     def train_once(self) -> None:
         while not self.is_finished():
-            r, c = self.p1.choose_action(
-                UltimateTicTacToe.immutable_representation(self.state())
-            )
+            r, c = self.p1.choose_action(UltimateTicTacToe.immutable_of(self.state()))
             self.play(r, c)
-            self.p1.add_state(UltimateTicTacToe.immutable_representation(self.state()))
+            self.p1.add_state(UltimateTicTacToe.immutable_of(self.state()))
 
             if self.is_finished():
                 break
 
-            r, c = self.p2.choose_action(
-                UltimateTicTacToe.immutable_representation(self.state())
-            )
+            r, c = self.p2.choose_action(UltimateTicTacToe.immutable_of(self.state()))
             self.play(r, c)
-            self.p2.add_state(UltimateTicTacToe.immutable_representation(self.state()))
+            self.p2.add_state(UltimateTicTacToe.immutable_of(self.state()))
 
             if self.is_finished():
                 break
@@ -160,7 +156,7 @@ class UltimateMonteCarloLearner(
         (sec, loc) = action
         a = UltimateTicTacToe.to_action(sec, loc)
         s = ir_to_state(ir)
-        return UltimateTicTacToe.immutable_representation(UltimateTicTacToe.apply(s, a))
+        return UltimateTicTacToe.immutable_of(UltimateTicTacToe.apply(s, a))
 
 
 MCP1_POLICY = "src/games/ultimate_ttt/mcp1.pkl"
@@ -176,7 +172,7 @@ def monte_carlo_trained_game():
     while not g.is_finished():
         print(f"\n{g.show()}\n")
         sec, loc = computer1.choose_action(
-            UltimateTicTacToe.immutable_representation(g.state()), exploit=True
+            UltimateTicTacToe.immutable_of(g.state()), exploit=True
         )
         g.play(sec, loc)
         print(f"computer X plays at section {sec} location {loc}")
@@ -185,7 +181,7 @@ def monte_carlo_trained_game():
 
         print(f"\n{g.show()}\n")
         sec, loc = computer2.choose_action(
-            UltimateTicTacToe.immutable_representation(g.state()), exploit=True
+            UltimateTicTacToe.immutable_of(g.state()), exploit=True
         )
         g.play(sec, loc)
         print(f"computer O plays at section {sec} location {loc}")

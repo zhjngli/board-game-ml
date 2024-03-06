@@ -77,13 +77,13 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
         player = state.player
 
         turn = 0
-        while not self.game.finished(state):
+        while not self.game.check_finished(state):
             turn += 1
-            oriented_state = self.game.oriented_state(state)
+            oriented_state = self.game.orient_state(state)
             temperature = 1 if turn < self.temperature_threshold else 0
             pi = self.m.action_probabilities(oriented_state, temperature)
-            bs = self.game.symmetries(oriented_state.board)
-            pis = self.game.symmetries(np.asarray(pi))
+            bs = self.game.symmetries_of(oriented_state.board)
+            pis = self.game.symmetries_of(np.asarray(pi))
 
             for b, p in zip(bs, pis):
                 training_data.append((b, player, p, None))
@@ -93,7 +93,7 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
             state = self.game.apply(state, action)
             player = state.player
 
-        reward = self.game.reward(state)
+        reward = self.game.calculate_reward(state)
         return [
             (x[0], x[2], reward * ((-1) ** (x[1] != player))) for x in training_data
         ]
@@ -162,14 +162,14 @@ class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
             state = self.game.state()
             player = state.player
 
-            while not self.game.finished(state):
+            while not self.game.check_finished(state):
                 # oriented_state = self.game.oriented_state(state)  # only needed for nn prediction
                 play = play1 if player == P1 else play2
                 a = play(state)
                 state = self.game.apply(state, a)
                 player = state.player
 
-            r = self.game.reward(state)
+            r = self.game.calculate_reward(state)
             if r == P1WIN:
                 p1wins += 1
             elif r == P2WIN:

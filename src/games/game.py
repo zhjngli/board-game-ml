@@ -38,36 +38,24 @@ def switch_player(p: Player) -> Player:
 
 class Game(ABC, Generic[State, ImmutableRepresentation]):
     @abstractmethod
-    def immutable_representation(self, state: State) -> ImmutableRepresentation:
-        """
-        Returns an immutable (hashable) representation of the given game state.
-        """
-        pass
-
-    @abstractmethod
     def reset(self) -> None:
+        """
+        Resets the game.
+        """
         pass
 
     @abstractmethod
     def state(self) -> State:
-        pass
-
-    @abstractmethod
-    def oriented_state(self, state: State) -> State:
         """
-        Returns a state that is from the perspective of player 1, no matter the input state.
-        This helps with a constant input for training the neural network.
+        Returns the current state of the game.
         """
         pass
 
+    @staticmethod
     @abstractmethod
-    def finished(self, state: State) -> bool:
-        pass
-
-    @abstractmethod
-    def reward(self, state: State) -> float:
+    def immutable_of(state: State) -> ImmutableRepresentation:
         """
-        A reward to pass to the agent at the given state.
+        Returns an immutable (hashable) representation of the given game state.
         """
         pass
 
@@ -77,26 +65,57 @@ class Game(ABC, Generic[State, ImmutableRepresentation]):
         The number of possible actions for a given game.
         For games with a board like tic tac toe, this is straightforward.
         For games such as photosynthesis, we need to have a mapping between the action and the move.
+
+        For some games, this can be a static method, e.g. TicTacToe. The board is always constant.
+        For games like Digit Party, this won't be a static method since it depends on game construction (rows and cols)
         """
         pass
 
+    @staticmethod
     @abstractmethod
-    def actions(self, state: State) -> List[ActionStatus]:
+    def actions(state: State) -> List[ActionStatus]:
         """
         Get all the actions available at the given state. 1 represents a valid action and 0 represents invalid.
         """
         pass
 
+    @staticmethod
     @abstractmethod
-    def apply(self, state: State, action: Action) -> State:
+    def apply(state: State, action: Action) -> State:
         """
-        Apply an action to the given state.
+        Apply an action to the given state, and return the new state
         """
         pass
 
+    @staticmethod
     @abstractmethod
-    def symmetries(self, a: NDArray) -> List[NDArray]:
+    def check_finished(state: State) -> bool:
         """
-        List the symmetries of the current board or policy.
+        Checks whether the given state is a finished game.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def calculate_reward(state: State) -> float:
+        """
+        A reward to pass to the agent at the given state.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def orient_state(state: State) -> State:
+        """
+        Returns a state that is from the perspective of player 1, no matter the input state.
+        This helps with a constant input for training the neural network.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def symmetries_of(a: NDArray) -> List[NDArray]:
+        """
+        List the symmetries of the given board or policy.
         """
         pass

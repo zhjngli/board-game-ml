@@ -47,7 +47,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
         for _ in range(self.num_searches):
             self.search(state)
 
-        ir: ImmutableRepresentation = self.game.immutable_representation(state)
+        ir: ImmutableRepresentation = self.game.immutable_of(state)
         sa_visits = [
             self.nsa[(ir, a)] if (ir, a) in self.nsa else 0
             for a in range(self.game.num_actions())
@@ -68,10 +68,14 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
         return [v / total_visits for v in visits]
 
     def search(self, state: State) -> float:
-        ir = self.game.immutable_representation(state)
+        ir = self.game.immutable_of(state)
 
         if ir not in self.evs:
-            self.evs[ir] = self.game.reward(state) if self.game.finished(state) else 0
+            self.evs[ir] = (
+                self.game.calculate_reward(state)
+                if self.game.check_finished(state)
+                else 0
+            )
         if self.evs[ir] != 0:
             return -self.evs[ir]
 
@@ -116,7 +120,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, ImmutableRepresentation]):
 
         a = best_a
         next_s = self.game.apply(state, a)
-        next_s = self.game.oriented_state(next_s)
+        next_s = self.game.orient_state(next_s)
 
         v = self.search(next_s)
 

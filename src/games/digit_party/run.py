@@ -95,7 +95,7 @@ class DigitPartyQTrainer(DigitParty, Trainer):
     def train_once(self) -> None:
         while not self.is_finished():
             curr_score = self.score
-            ir = self.immutable_representation(self.state())
+            ir = self.immutable_of(self.state())
             action = self.player.choose_action(ir)
 
             r, c = action
@@ -106,7 +106,7 @@ class DigitPartyQTrainer(DigitParty, Trainer):
                 ir,
                 action,
                 new_score - curr_score,
-                self.immutable_representation(self.state()),
+                self.immutable_of(self.state()),
             )
 
         self.reset()
@@ -122,14 +122,14 @@ def trained_game(game_size: int) -> None:
         epsilon=0.5,
     )
     g = DigitPartyQTrainer(player=q, n=game_size)
-    g.train(episodes=1)
+    g.train(episodes=1000000)
 
     while not g.is_finished():
         print(f"\n{g.show_board()}\n")
         curr_digit, next_digit = g.next_digits()
         print(f"current digit: {curr_digit}")
         print(f"next digit: {next_digit}")
-        r, c = q.choose_action(g.immutable_representation(g.state()), exploit=True)
+        r, c = q.choose_action(g.immutable_of(g.state()), exploit=True)
         g.place(r, c)
         print(f"\ncomputer plays {curr_digit} at ({r}, {c})!")
 
@@ -152,7 +152,7 @@ def many_trained_games(game_size: int, games=10000) -> None:
     percentages = []
     for e in range(1, games + 1):
         while not g.is_finished():
-            r, c = q.choose_action(g.immutable_representation(g.state()), exploit=True)
+            r, c = q.choose_action(g.immutable_of(g.state()), exploit=True)
             g.place(r, c)
 
         score += g.score
