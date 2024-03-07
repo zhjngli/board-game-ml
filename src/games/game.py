@@ -21,7 +21,7 @@ class BasicState:
 
 State = TypeVar("State", bound=BasicState)
 Action = int
-ImmutableRepresentation = TypeVar("ImmutableRepresentation")  # TODO: enforce hashable
+Immutable = TypeVar("Immutable")  # TODO: enforce hashable/immutable
 
 ActionStatus = Literal[1, 0]
 VALID: ActionStatus = 1
@@ -36,7 +36,7 @@ def switch_player(p: Player) -> Player:
     return P1 if p == P2 else P2
 
 
-class Game(ABC, Generic[State, ImmutableRepresentation]):
+class Game(ABC, Generic[State, Immutable]):
     @abstractmethod
     def reset(self) -> None:
         """
@@ -53,7 +53,7 @@ class Game(ABC, Generic[State, ImmutableRepresentation]):
 
     @staticmethod
     @abstractmethod
-    def immutable_of(state: State) -> ImmutableRepresentation:
+    def to_immutable(state: State) -> Immutable:
         """
         Returns an immutable (hashable) representation of the given game state.
         """

@@ -277,7 +277,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             return None, None
 
     @staticmethod
-    def immutable_of(state: DigitPartyState) -> DigitPartyIR:
+    def to_immutable(state: DigitPartyState) -> DigitPartyIR:
         return DigitPartyIR(
             board=tuple(tuple(row) for row in state.board), next=state.next
         )

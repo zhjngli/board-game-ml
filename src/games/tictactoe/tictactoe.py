@@ -116,7 +116,7 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
     @staticmethod
     def applyIR(ir: TicTacToeIR, a: Action) -> TicTacToeIR:
         s = TicTacToeState(board=np.asarray(ir.board), player=ir.player)
-        return TicTacToe.immutable_of(TicTacToe.apply(s, a))
+        return TicTacToe.to_immutable(TicTacToe.apply(s, a))
 
     @staticmethod
     def _is_win(p: Player, board: TTTBoard) -> bool:
@@ -204,7 +204,7 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
         return syms
 
     @staticmethod
-    def immutable_of(state: TicTacToeState) -> TicTacToeIR:
+    def to_immutable(state: TicTacToeState) -> TicTacToeIR:
         return TicTacToeIR(
             board=TicTacToe.get_board_rep(state.board), player=state.player
         )
@@ -274,16 +274,16 @@ class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
 
     def train_once(self) -> None:
         while not self.is_finished():
-            r, c = self.p1.choose_action(self.immutable_of(self.state()))
+            r, c = self.p1.choose_action(self.to_immutable(self.state()))
             self.play1(r, c)
-            self.p1.add_state(self.immutable_of(self.state()))
+            self.p1.add_state(self.to_immutable(self.state()))
 
             if self.is_finished():
                 break
 
-            r, c = self.p2.choose_action(self.immutable_of(self.state()))
+            r, c = self.p2.choose_action(self.to_immutable(self.state()))
             self.play2(r, c)
-            self.p2.add_state(self.immutable_of(self.state()))
+            self.p2.add_state(self.to_immutable(self.state()))
 
             if self.is_finished():
                 break
@@ -338,7 +338,7 @@ class TicTacToeQTrainer(TicTacToe, Trainer):
     # TODO: this training is pretty dumb, doesn't work well
     def train_once(self) -> None:
         while not self.is_finished():
-            ir = self.immutable_of(self.state())
+            ir = self.to_immutable(self.state())
             action = self.p1.choose_action(ir)
             r, c = action
             self.play1(r, c)
@@ -346,20 +346,20 @@ class TicTacToeQTrainer(TicTacToe, Trainer):
             if self.is_finished():
                 break
 
-            ir = self.immutable_of(self.state())
+            ir = self.to_immutable(self.state())
             action = self.p2.choose_action(ir)
             r, c = action
             self.play2(r, c)
 
         if self.win(P1):
-            self.p1.update_q_value(ir, action, 1, self.immutable_of(self.state()))
-            self.p2.update_q_value(ir, action, -1, self.immutable_of(self.state()))
+            self.p1.update_q_value(ir, action, 1, self.to_immutable(self.state()))
+            self.p2.update_q_value(ir, action, -1, self.to_immutable(self.state()))
         elif self.win(P2):
-            self.p1.update_q_value(ir, action, -1, self.immutable_of(self.state()))
-            self.p2.update_q_value(ir, action, 1, self.immutable_of(self.state()))
+            self.p1.update_q_value(ir, action, -1, self.to_immutable(self.state()))
+            self.p2.update_q_value(ir, action, 1, self.to_immutable(self.state()))
         elif self.board_filled():
-            self.p1.update_q_value(ir, action, -0.1, self.immutable_of(self.state()))
-            self.p2.update_q_value(ir, action, 0, self.immutable_of(self.state()))
+            self.p1.update_q_value(ir, action, -0.1, self.to_immutable(self.state()))
+            self.p2.update_q_value(ir, action, 0, self.to_immutable(self.state()))
         else:
             raise Exception("giving rewards when game's not over. something's wrong!")
         self.reset()
@@ -381,7 +381,7 @@ class TicTacToeQLearner(SimpleQLearner[TicTacToeIR, Tuple[int, int]]):
 
 def _computer_play(g: TicTacToe, p: TicTacToeMonteCarloLearner | TicTacToeQLearner):
     print(f"\n{g.show()}\n")
-    r, c = p.choose_action(g.immutable_of(g.state()), exploit=True)
+    r, c = p.choose_action(g.to_immutable(g.state()), exploit=True)
     g.play(r, c)
     print(f"\ncomputer plays at ({r}, {c})!")
 
@@ -461,11 +461,11 @@ def _many_games(
     ties = 0
     for _ in range(games):
         while not g.is_finished():
-            r, c = computer1.choose_action(g.immutable_of(g.state()), exploit=True)
+            r, c = computer1.choose_action(g.to_immutable(g.state()), exploit=True)
             g.play(r, c)
             if g.is_finished():
                 break
-            r, c = computer2.choose_action(g.immutable_of(g.state()), exploit=True)
+            r, c = computer2.choose_action(g.to_immutable(g.state()), exploit=True)
             g.play(r, c)
 
         if g.win(P1):

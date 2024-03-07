@@ -7,17 +7,7 @@ from typing import Callable, Deque, Generic, List, NamedTuple, Optional, Tuple
 
 import numpy as np
 
-from games.game import (
-    P1,
-    P1WIN,
-    P2WIN,
-    Action,
-    Board,
-    Game,
-    ImmutableRepresentation,
-    Player,
-    State,
-)
+from games.game import P1, P1WIN, P2WIN, Action, Board, Game, Immutable, Player, State
 from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
@@ -39,14 +29,14 @@ class A0Parameters(NamedTuple):
 # in the current scheme, (Board, Policy, Value), only captures the type of games s.t.
 # the neural network input is the board, and the output is the policy and value.
 # Other games can potentially have other input that's not fully captured in the board.
-class AlphaZero(ABC, Generic[State, ImmutableRepresentation]):
+class AlphaZero(ABC, Generic[State, Immutable]):
     """
     Combines a neural network with Monte Carlo Tree Search to increase training efficiency and reduce memory required for training.
     """
 
     def __init__(
         self,
-        game: Game[State, ImmutableRepresentation],
+        game: Game[State, Immutable],
         nn: NeuralNetwork,
         params: A0Parameters,
         m_params: MCTSParameters,

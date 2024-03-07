@@ -229,7 +229,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         elif TicTacToe._is_board_filled(t):
             return FinishedTTTState.Tie
         else:
-            return TicTacToe.immutable_of(TicTacToeState(board=t, player=P1)).board
+            return TicTacToe.to_immutable(TicTacToeState(board=t, player=P1)).board
 
     @staticmethod
     def get_board_rep(board: UltimateBoard) -> UltimateBoardIR:
@@ -379,7 +379,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return syms
 
     @staticmethod
-    def immutable_of(state: UltimateState) -> UltimateIR:
+    def to_immutable(state: UltimateState) -> UltimateIR:
         return UltimateIR(
             board=UltimateTicTacToe.get_board_rep(state.board),
             player=state.player,
