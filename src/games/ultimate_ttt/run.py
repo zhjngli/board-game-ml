@@ -28,7 +28,6 @@ from games.ultimate_ttt.ultimate import (
     UltimateIR,
     UltimateState,
     UltimateTicTacToe,
-    ir_to_state,
 )
 from learners.alpha_zero.alpha_zero import A0Parameters, AlphaZero
 from learners.alpha_zero.monte_carlo_tree_search import MCTSParameters
@@ -105,16 +104,16 @@ class UltimateMonteCarloTrainer(UltimateTicTacToe, Trainer):
 
     def train_once(self) -> None:
         while not self.is_finished():
-            r, c = self.p1.choose_action(UltimateTicTacToe.immutable_of(self.state()))
+            r, c = self.p1.choose_action(UltimateTicTacToe.to_immutable(self.state()))
             self.play(r, c)
-            self.p1.add_state(UltimateTicTacToe.immutable_of(self.state()))
+            self.p1.add_state(UltimateTicTacToe.to_immutable(self.state()))
 
             if self.is_finished():
                 break
 
-            r, c = self.p2.choose_action(UltimateTicTacToe.immutable_of(self.state()))
+            r, c = self.p2.choose_action(UltimateTicTacToe.to_immutable(self.state()))
             self.play(r, c)
-            self.p2.add_state(UltimateTicTacToe.immutable_of(self.state()))
+            self.p2.add_state(UltimateTicTacToe.to_immutable(self.state()))
 
             if self.is_finished():
                 break
@@ -142,10 +141,8 @@ class UltimateMonteCarloTrainer(UltimateTicTacToe, Trainer):
 class UltimateMonteCarloLearner(
     MonteCarloLearner[UltimateIR, Tuple[Section, Location]]
 ):
-    def get_actions_from_state(
-        self, state: UltimateIR
-    ) -> List[Tuple[Section, Location]]:
-        valid_actions = UltimateTicTacToe.actions(ir_to_state(state))
+    def get_actions_from_state(self, ir: UltimateIR) -> List[Tuple[Section, Location]]:
+        valid_actions = UltimateTicTacToe.actions(UltimateTicTacToe.from_immutable(ir))
         return [
             UltimateTicTacToe.from_action(a)
             for a in range(len(valid_actions))
@@ -155,8 +152,8 @@ class UltimateMonteCarloLearner(
     def apply(self, ir: UltimateIR, action: Tuple[Section, Location]) -> UltimateIR:
         (sec, loc) = action
         a = UltimateTicTacToe.to_action(sec, loc)
-        s = ir_to_state(ir)
-        return UltimateTicTacToe.immutable_of(UltimateTicTacToe.apply(s, a))
+        s = UltimateTicTacToe.from_immutable(ir)
+        return UltimateTicTacToe.to_immutable(UltimateTicTacToe.apply(s, a))
 
 
 MCP1_POLICY = "src/games/ultimate_ttt/mcp1.pkl"
@@ -172,7 +169,7 @@ def monte_carlo_trained_game():
     while not g.is_finished():
         print(f"\n{g.show()}\n")
         sec, loc = computer1.choose_action(
-            UltimateTicTacToe.immutable_of(g.state()), exploit=True
+            UltimateTicTacToe.to_immutable(g.state()), exploit=True
         )
         g.play(sec, loc)
         print(f"computer X plays at section {sec} location {loc}")
@@ -181,7 +178,7 @@ def monte_carlo_trained_game():
 
         print(f"\n{g.show()}\n")
         sec, loc = computer2.choose_action(
-            UltimateTicTacToe.immutable_of(g.state()), exploit=True
+            UltimateTicTacToe.to_immutable(g.state()), exploit=True
         )
         g.play(sec, loc)
         print(f"computer O plays at section {sec} location {loc}")
