@@ -2,7 +2,7 @@ import os
 import pickle
 import random
 from collections import defaultdict
-from typing import Generic, List, NamedTuple, Tuple, TypeVar
+from typing import Generic, List, NamedTuple, Tuple
 
 from games.game import VALID, Action, Game, Immutable, State
 
@@ -12,13 +12,15 @@ class SimpleQParameters(NamedTuple):
     gamma: float  # reward decay rate
     epsilon: float  # explore rate
 
+DefaultQParams = SimpleQParameters(alpha=0.1, gamma=0.9, epsilon=0.1)
+
 class SimpleQLearner(Generic[State, Immutable]):
     """
     A default Q Learner that uses default dictionaries to track the Q table. Works for simple games.
     For complex games, we probably need to serialize the states/actions so learning can be more efficient.
     """
 
-    def __init__(self, game: Game[State, Immutable], params: SimpleQParameters, q_pickle: str = "") -> None:
+    def __init__(self, game: Game[State, Immutable], q_pickle: str = "", params: SimpleQParameters = DefaultQParams) -> None:
         self.game = game
 
         self.q_pickle = q_pickle
@@ -42,10 +44,8 @@ class SimpleQLearner(Generic[State, Immutable]):
             d[a] = 0.0
         return d
 
-    # TODO: maybe extract choose_action to a learner or agent class
-    def choose_action(self, state: State, exploit: bool = False) -> Action:
-        ir = self.game.immutable_of(state)
-        legal_actions = self.get_actions_from_state(state)
+    def choose_action(self, ir: Immutable, exploit: bool = False) -> Action:
+        legal_actions = self.get_actions_from_state(ir)
         if random.uniform(0, 1) < self.epsilon and not exploit:
             return random.choice(legal_actions)
         else:
@@ -60,14 +60,11 @@ class SimpleQLearner(Generic[State, Immutable]):
             return random.choice(best_actions)
 
     def update_q_value(
-        self, state: State, action: Action, reward: float, next_state: State
+        self, ir: Immutable, action: Action, reward: float, next_ir: Immutable
     ) -> None:
-        ir = self.game.immutable_of(state)
-        next_ir = self.game.immutable_of(next_state)
-
-        next_actions = self.get_actions_from_state(next_state)
+        next_actions = self.get_actions_from_state(next_ir)
         if next_actions:
-            random_action = random.choice(self.get_actions_from_state(next_state))
+            random_action = random.choice(self.get_actions_from_state(next_ir))
             best_next_action = max(
                 self.q_table[next_ir],
                 key=self.q_table[next_ir].__getitem__,
@@ -83,12 +80,12 @@ class SimpleQLearner(Generic[State, Immutable]):
             1 - self.alpha
         ) * current_q_value + self.alpha * (reward + self.gamma * next_q_value)
 
-    def get_actions_from_state(self, state: State) -> List[Action]:
+    def get_actions_from_state(self, ir: Immutable) -> List[Action]:
         """
         Gets a list of legal actions from a state
         """
         legals = []
-        actions = self.game.actions(state)
+        actions = self.game.actions(self.game.from_immutable(ir))
         for (a, status) in enumerate(actions):
             if status == VALID:
                 legals.append(a)

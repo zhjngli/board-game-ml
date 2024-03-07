@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from typing_extensions import override
 
 from games.digit_party.game import DigitParty, DigitPartyIR, DigitPartyPlacement, Empty
-from learners.q import SimpleQLearner
+from learners.q import SimpleQLearner, SimpleQParameters
 from learners.trainer import Trainer
 
 
@@ -47,7 +47,8 @@ def human_game() -> None:
             continue
 
         try:
-            game.place(r, c)
+            action = r * game.n + c
+            game.place(action)
         except ValueError as e:
             print(str(e))
 
@@ -58,31 +59,31 @@ def human_game() -> None:
     print(f"% of total: {100 * game.score / game.theoretical_max_score()}")
 
 
-class DigitPartyQLearner(SimpleQLearner[DigitPartyIR, DigitPartyPlacement]):
-    def __init__(
-        self, n: int, q_pickle: str = "", alpha=0.1, gamma=0.9, epsilon=0.1
-    ) -> None:
-        super().__init__(q_pickle, alpha, gamma, epsilon)
-        self.n = n
+# class DigitPartyQLearner(SimpleQLearner[DigitPartyIR, DigitPartyPlacement]):
+#     def __init__(
+#         self, n: int, q_pickle: str = "", alpha=0.1, gamma=0.9, epsilon=0.1
+#     ) -> None:
+#         super().__init__(q_pickle, alpha, gamma, epsilon)
+#         self.n = n
 
-    def default_action_q_values(self) -> dict[DigitPartyPlacement, float]:
-        actions = {}
-        for r in range(self.n):
-            for c in range(self.n):
-                actions[(r, c)] = 0.0
-        return actions
+#     def default_action_q_values(self) -> dict[DigitPartyPlacement, float]:
+#         actions = {}
+#         for r in range(self.n):
+#             for c in range(self.n):
+#                 actions[(r, c)] = 0.0
+#         return actions
 
-    def get_actions_from_state(self, state: DigitPartyIR) -> List[DigitPartyPlacement]:
-        r = len(state.board)
-        c = len(state.board[0])
-        return [
-            (i, j) for i in range(r) for j in range(c) if Empty == state.board[i][j]
-        ]
+#     def get_actions_from_state(self, state: DigitPartyIR) -> List[DigitPartyPlacement]:
+#         r = len(state.board)
+#         c = len(state.board[0])
+#         return [
+#             (i, j) for i in range(r) for j in range(c) if Empty == state.board[i][j]
+#         ]
 
 
 class DigitPartyQTrainer(DigitParty, Trainer):
     def __init__(
-        self, player: DigitPartyQLearner, n: int = 5, digits: List[int] | None = None
+        self, player: SimpleQLearner, n: int = 5, digits: List[int] | None = None
     ) -> None:
         super().__init__(n, digits)
         self.player = player
@@ -95,18 +96,17 @@ class DigitPartyQTrainer(DigitParty, Trainer):
     def train_once(self) -> None:
         while not self.is_finished():
             curr_score = self.score
-            ir = self.immutable_of(self.state())
+            ir = self.to_immutable(self.state())
             action = self.player.choose_action(ir)
 
-            r, c = action
-            self.place(r, c)
+            self.place(action)
             new_score = self.score
 
             self.player.update_q_value(
                 ir,
                 action,
                 new_score - curr_score,
-                self.immutable_of(self.state()),
+                self.to_immutable(self.state()),
             )
 
         self.reset()
@@ -116,51 +116,55 @@ def trained_game(game_size: int) -> None:
     # there's too many states in default digit party, so naive q learning is inexhaustive and doesn't work well
     # this type of naive training kinda maxes out at a 3x3 game, of around 60-65% of the max score.
     # for a 2x2 game, the result is trivially 100%
-    q = DigitPartyQLearner(
-        game_size,
+    q = SimpleQLearner(
+        game=DigitParty(game_size),
         q_pickle=f"src/games/digit_party/q-{game_size}x{game_size}.pkl",
-        epsilon=0.5,
+        params=SimpleQParameters(alpha=0.1, gamma=0.9, epsilon=0.5),
     )
-    g = DigitPartyQTrainer(player=q, n=game_size)
-    g.train(episodes=1000000)
+    t = DigitPartyQTrainer(player=q, n=game_size)
+    t.train(episodes=1000000)
 
-    while not g.is_finished():
-        print(f"\n{g.show_board()}\n")
-        curr_digit, next_digit = g.next_digits()
+    while not t.is_finished():
+        print(f"\n{t.show_board()}\n")
+        curr_digit, next_digit = t.next_digits()
         print(f"current digit: {curr_digit}")
         print(f"next digit: {next_digit}")
-        r, c = q.choose_action(g.immutable_of(g.state()), exploit=True)
-        g.place(r, c)
+        action = q.choose_action(DigitParty.to_immutable(t.state()), exploit=True)
+
+        t.place(action)
+        r, c = t.from_action(action)
         print(f"\ncomputer plays {curr_digit} at ({r}, {c})!")
 
-    print(g.show_board())
+    print(t.show_board())
     print("game finished!")
-    print(f"computer score: {g.score}")
-    print(f"theoretical max score: {g.theoretical_max_score()}")
-    print(f"% of total: {100 * g.score / g.theoretical_max_score():.2f}")
+    print(f"computer score: {t.score}")
+    print(f"theoretical max score: {t.theoretical_max_score()}")
+    print(f"% of total: {100 * t.score / t.theoretical_max_score():.2f}")
 
 
 def many_trained_games(game_size: int, games=10000) -> None:
-    q = DigitPartyQLearner(
-        game_size, q_pickle=f"src/games/digit_party/q-{game_size}x{game_size}.pkl"
+    q = SimpleQLearner(
+        game=DigitParty(game_size),
+        q_pickle=f"src/games/digit_party/q-{game_size}x{game_size}.pkl",
+        params=SimpleQParameters(alpha=0.1, gamma=0.9, epsilon=0.5),
     )
-    g = DigitPartyQTrainer(player=q, n=game_size)
+    t = DigitPartyQTrainer(player=q, n=game_size)
 
     score = 0
     theoretical_max = 0
     percent_per_game = 0.0
     percentages = []
     for e in range(1, games + 1):
-        while not g.is_finished():
-            r, c = q.choose_action(g.immutable_of(g.state()), exploit=True)
-            g.place(r, c)
+        while not t.is_finished():
+            action= q.choose_action(DigitParty.to_immutable(t.state()), exploit=True)
+            t.place(action)
 
-        score += g.score
-        t_max = g.theoretical_max_score()
+        score += t.score
+        t_max = t.theoretical_max_score()
         theoretical_max += t_max
-        percent_per_game += g.score / t_max
-        percentages.append(100 * g.score / t_max)
-        g.reset()
+        percent_per_game += t.score / t_max
+        percentages.append(100 * t.score / t_max)
+        t.reset()
 
         if e % 1000 == 0:
             print(f"Episode {e}/{games}")

@@ -48,6 +48,8 @@ class DigitPartyState(BasicState):
 class DigitPartyIR(NamedTuple):
     board: Tuple  # TODO: better type
     next: Tuple[Digit | None, Digit | None]
+    score: int
+    digits: Tuple[Digit, ...]
 
 
 DigitPartyPlacement = Tuple[int, int]
@@ -69,7 +71,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             self.digits: List[Digit] = list(map(lambda d: Digit(d), digits))
         else:
             self.digits = [Digit(random.randint(1, self.max_num)) for _ in range(n * n)]
-        self.placements: List[Tuple[Tuple[int, int], Digit]] = []
+        self.placements: List[Tuple[DigitPartyPlacement, Digit]] = []
         self.score = 0
 
     def reset(self) -> None:
@@ -91,11 +93,17 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
     def _check_range(n: int, r: int, c: int) -> None:
         if r < 0 or r >= n or c < 0 or c >= n:
             raise ValueError(f"Row {r} or column {c} outside of board of size {n}")
+    
+    def from_action(self, a: Action) -> DigitPartyPlacement:
+        r = int(a / self.n)
+        c = a % self.n
+        return r, c
 
-    def place(self, r: int, c: int) -> None:
+    def place(self, a: Action) -> None:
         """
         Places the next digit on the given r,c tile.
         """
+        r, c = self.from_action(a)
         DigitParty._check_range(self.n, r, c)
         if self.board[r][c] != Empty:
             raise ValueError(
@@ -277,9 +285,22 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             return None, None
 
     @staticmethod
-    def immutable_of(state: DigitPartyState) -> DigitPartyIR:
+    def to_immutable(state: DigitPartyState) -> DigitPartyIR:
         return DigitPartyIR(
-            board=tuple(tuple(row) for row in state.board), next=state.next
+            board=tuple(tuple(row) for row in state.board),
+            next=state.next,
+            score=state.score,
+            digits=tuple(state.digits)
+        )
+    
+    @staticmethod
+    def from_immutable(ir: DigitPartyIR) -> DigitPartyState:
+        return DigitPartyState(
+            board=np.asarray(ir.board),
+            player=P1,
+            next=ir.next,
+            score=ir.score,
+            digits=list(ir.digits)
         )
 
     def state(self) -> DigitPartyState:
@@ -298,10 +319,9 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
 
     @staticmethod
     def actions(state: DigitPartyState) -> List[ActionStatus]:
-        b = np.copy(state.board)
-        b[b == 0] = 1
-        b[b != 0] = 0
-        return list(b.reshape(state.board.size))
+        mask: NDArray = state.board == 0
+        mask = mask.astype(int)
+        return list(mask.reshape(state.board.size))
 
     def num_actions(self) -> int:
         return self.n * self.n

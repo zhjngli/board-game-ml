@@ -116,7 +116,7 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
     @staticmethod
     def applyIR(ir: TicTacToeIR, a: Action) -> TicTacToeIR:
         s = TicTacToeState(board=np.asarray(ir.board), player=ir.player)
-        return TicTacToe.immutable_of(TicTacToe.apply(s, a))
+        return TicTacToe.to_immutable(TicTacToe.apply(s, a))
 
     @staticmethod
     def _is_win(p: Player, board: TTTBoard) -> bool:
@@ -204,9 +204,15 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
         return syms
 
     @staticmethod
-    def immutable_of(state: TicTacToeState) -> TicTacToeIR:
+    def to_immutable(state: TicTacToeState) -> TicTacToeIR:
         return TicTacToeIR(
             board=TicTacToe.get_board_rep(state.board), player=state.player
+        )
+
+    @staticmethod
+    def from_immutable(ir: TicTacToeIR) -> TicTacToeState:
+        return TicTacToeState(
+            board=np.asarray(ir.board), player=ir.player
         )
 
     @staticmethod
@@ -274,16 +280,16 @@ class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
 
     def train_once(self) -> None:
         while not self.is_finished():
-            r, c = self.p1.choose_action(self.immutable_of(self.state()))
+            r, c = self.p1.choose_action(self.to_immutable(self.state()))
             self.play1(r, c)
-            self.p1.add_state(self.immutable_of(self.state()))
+            self.p1.add_state(self.to_immutable(self.state()))
 
             if self.is_finished():
                 break
 
-            r, c = self.p2.choose_action(self.immutable_of(self.state()))
+            r, c = self.p2.choose_action(self.to_immutable(self.state()))
             self.play2(r, c)
-            self.p2.add_state(self.immutable_of(self.state()))
+            self.p2.add_state(self.to_immutable(self.state()))
 
             if self.is_finished():
                 break
@@ -381,7 +387,7 @@ class TicTacToeMonteCarloLearner(MonteCarloLearner[TicTacToeIR, Tuple[int, int]]
 
 def _computer_play(g: TicTacToe, p: TicTacToeMonteCarloLearner):
     print(f"\n{g.show()}\n")
-    r, c = p.choose_action(g.immutable_of(g.state()), exploit=True)
+    r, c = p.choose_action(g.to_immutable(g.state()), exploit=True)
     g.play(r, c)
     print(f"\ncomputer plays at ({r}, {c})!")
 
@@ -461,11 +467,11 @@ def _many_games(
     ties = 0
     for _ in range(games):
         while not g.is_finished():
-            r, c = computer1.choose_action(g.immutable_of(g.state()), exploit=True)
+            r, c = computer1.choose_action(g.to_immutable(g.state()), exploit=True)
             g.play(r, c)
             if g.is_finished():
                 break
-            r, c = computer2.choose_action(g.immutable_of(g.state()), exploit=True)
+            r, c = computer2.choose_action(g.to_immutable(g.state()), exploit=True)
             g.play(r, c)
 
         if g.win(P1):

@@ -53,9 +53,17 @@ class Game(ABC, Generic[State, Immutable]):
 
     @staticmethod
     @abstractmethod
-    def immutable_of(state: State) -> Immutable:
+    def to_immutable(state: State) -> Immutable:
         """
         Returns an immutable (hashable) representation of the given game state.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def from_immutable(ir: Immutable) -> State:
+        """
+        Returns the state of the game given the immutable representation.
         """
         pass
 

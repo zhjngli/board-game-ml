@@ -64,27 +64,6 @@ class UltimateIR(NamedTuple):
     active_nonant: Optional[Section]
 
 
-def ir_to_state(ir: UltimateIR) -> UltimateState:
-    board = np.zeros((3, 3, 3, 3))
-    for R in range(3):
-        for C in range(3):
-            if ir.board[R][C] == FinishedTTTState.XWin:
-                board[R][C] = P1
-            elif ir.board[R][C] == FinishedTTTState.OWin:
-                board[R][C] = P2
-            elif ir.board[R][C] == FinishedTTTState.Tie:
-                board[R][C] = np.asarray(
-                    [
-                        [XTile, XTile, OTile],
-                        [OTile, XTile, XTile],
-                        [XTile, OTile, OTile],
-                    ]
-                )
-            else:
-                board[R][C] = np.asarray(ir.board[R][C])
-    return UltimateState(board=board, player=ir.player, active_nonant=ir.active_nonant)
-
-
 class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
     def __init__(self) -> None:
         self.reset()
@@ -229,7 +208,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         elif TicTacToe._is_board_filled(t):
             return FinishedTTTState.Tie
         else:
-            return TicTacToe.immutable_of(TicTacToeState(board=t, player=P1)).board
+            return TicTacToe.to_immutable(TicTacToeState(board=t, player=P1)).board
 
     @staticmethod
     def get_board_rep(board: UltimateBoard) -> UltimateBoardIR:
@@ -379,12 +358,33 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return syms
 
     @staticmethod
-    def immutable_of(state: UltimateState) -> UltimateIR:
+    def to_immutable(state: UltimateState) -> UltimateIR:
         return UltimateIR(
             board=UltimateTicTacToe.get_board_rep(state.board),
             player=state.player,
             active_nonant=state.active_nonant,
         )
+
+    @staticmethod
+    def from_immutable(ir: UltimateIR) -> UltimateState:
+        board = np.zeros((3, 3, 3, 3))
+        for R in range(3):
+            for C in range(3):
+                if ir.board[R][C] == FinishedTTTState.XWin:
+                    board[R][C] = P1
+                elif ir.board[R][C] == FinishedTTTState.OWin:
+                    board[R][C] = P2
+                elif ir.board[R][C] == FinishedTTTState.Tie:
+                    board[R][C] = np.asarray(
+                        [
+                            [XTile, XTile, OTile],
+                            [OTile, XTile, XTile],
+                            [XTile, OTile, OTile],
+                        ]
+                    )
+                else:
+                    board[R][C] = np.asarray(ir.board[R][C])
+        return UltimateState(board=board, player=ir.player, active_nonant=ir.active_nonant)
 
     @staticmethod
     def orient_state(state: UltimateState) -> UltimateState:
