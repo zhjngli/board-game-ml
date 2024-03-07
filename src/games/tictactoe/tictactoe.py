@@ -17,7 +17,6 @@ from games.game import (
     switch_player,
 )
 from learners.monte_carlo import MonteCarloLearner
-from learners.q import SimpleQLearner
 from learners.trainer import Trainer
 
 Tile = Literal[1, 0, -1]
@@ -211,9 +210,7 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
 
     @staticmethod
     def from_immutable(ir: TicTacToeIR) -> TicTacToeState:
-        return TicTacToeState(
-            board=np.asarray(ir.board), player=ir.player
-        )
+        return TicTacToeState(board=np.asarray(ir.board), player=ir.player)
 
     @staticmethod
     def orient_state(state: TicTacToeState) -> TicTacToeState:

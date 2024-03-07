@@ -384,7 +384,9 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
                     )
                 else:
                     board[R][C] = np.asarray(ir.board[R][C])
-        return UltimateState(board=board, player=ir.player, active_nonant=ir.active_nonant)
+        return UltimateState(
+            board=board, player=ir.player, active_nonant=ir.active_nonant
+        )
 
     @staticmethod
     def orient_state(state: UltimateState) -> UltimateState:

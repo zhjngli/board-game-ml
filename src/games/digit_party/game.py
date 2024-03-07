@@ -93,7 +93,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
     def _check_range(n: int, r: int, c: int) -> None:
         if r < 0 or r >= n or c < 0 or c >= n:
             raise ValueError(f"Row {r} or column {c} outside of board of size {n}")
-    
+
     def from_action(self, a: Action) -> DigitPartyPlacement:
         r = int(a / self.n)
         c = a % self.n
@@ -290,9 +290,9 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             board=tuple(tuple(row) for row in state.board),
             next=state.next,
             score=state.score,
-            digits=tuple(state.digits)
+            digits=tuple(state.digits),
         )
-    
+
     @staticmethod
     def from_immutable(ir: DigitPartyIR) -> DigitPartyState:
         return DigitPartyState(
@@ -300,7 +300,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             player=P1,
             next=ir.next,
             score=ir.score,
-            digits=list(ir.digits)
+            digits=list(ir.digits),
         )
 
     def state(self) -> DigitPartyState:

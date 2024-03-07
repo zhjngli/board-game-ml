@@ -6,17 +6,7 @@ from typing import Callable, Deque, Generic, List, NamedTuple, Optional, Tuple
 
 import numpy as np
 
-from games.game import (
-    P1,
-    P1WIN,
-    P2WIN,
-    Action,
-    Board,
-    Game,
-    Immutable,
-    Player,
-    State,
-)
+from games.game import P1, P1WIN, P2WIN, Action, Board, Game, Immutable, Player, State
 from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,

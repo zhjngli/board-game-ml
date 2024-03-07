@@ -3,7 +3,7 @@ from typing import List
 from matplotlib import pyplot as plt
 from typing_extensions import override
 
-from games.digit_party.game import DigitParty, DigitPartyIR, DigitPartyPlacement, Empty
+from games.digit_party.game import DigitParty
 from learners.q import SimpleQLearner, SimpleQParameters
 from learners.trainer import Trainer
 
@@ -156,7 +156,7 @@ def many_trained_games(game_size: int, games=10000) -> None:
     percentages = []
     for e in range(1, games + 1):
         while not t.is_finished():
-            action= q.choose_action(DigitParty.to_immutable(t.state()), exploit=True)
+            action = q.choose_action(DigitParty.to_immutable(t.state()), exploit=True)
             t.place(action)
 
         score += t.score

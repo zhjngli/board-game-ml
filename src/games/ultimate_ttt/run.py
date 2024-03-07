@@ -141,9 +141,7 @@ class UltimateMonteCarloTrainer(UltimateTicTacToe, Trainer):
 class UltimateMonteCarloLearner(
     MonteCarloLearner[UltimateIR, Tuple[Section, Location]]
 ):
-    def get_actions_from_state(
-        self, ir: UltimateIR
-    ) -> List[Tuple[Section, Location]]:
+    def get_actions_from_state(self, ir: UltimateIR) -> List[Tuple[Section, Location]]:
         valid_actions = UltimateTicTacToe.actions(UltimateTicTacToe.from_immutable(ir))
         return [
             UltimateTicTacToe.from_action(a)

@@ -12,7 +12,9 @@ class SimpleQParameters(NamedTuple):
     gamma: float  # reward decay rate
     epsilon: float  # explore rate
 
+
 DefaultQParams = SimpleQParameters(alpha=0.1, gamma=0.9, epsilon=0.1)
+
 
 class SimpleQLearner(Generic[State, Immutable]):
     """
@@ -20,7 +22,12 @@ class SimpleQLearner(Generic[State, Immutable]):
     For complex games, we probably need to serialize the states/actions so learning can be more efficient.
     """
 
-    def __init__(self, game: Game[State, Immutable], q_pickle: str = "", params: SimpleQParameters = DefaultQParams) -> None:
+    def __init__(
+        self,
+        game: Game[State, Immutable],
+        q_pickle: str = "",
+        params: SimpleQParameters = DefaultQParams,
+    ) -> None:
         self.game = game
 
         self.q_pickle = q_pickle
@@ -30,7 +37,7 @@ class SimpleQLearner(Generic[State, Immutable]):
         if self.q_pickle and os.path.isfile(self.q_pickle):
             with open(self.q_pickle, "rb") as file:
                 self.q_table = pickle.load(file)
-        
+
         self.alpha = params.alpha
         self.gamma = params.gamma
         self.epsilon = params.epsilon
@@ -54,9 +61,7 @@ class SimpleQLearner(Generic[State, Immutable]):
                 (a, q) for (a, q) in self.q_table[ir].items() if a in legal_actions
             ]
             (_, best_q) = max(actions_q_vals, key=lambda x: x[1])
-            best_actions: List[Action] = [
-                a for (a, q) in actions_q_vals if q == best_q
-            ]
+            best_actions: List[Action] = [a for (a, q) in actions_q_vals if q == best_q]
             return random.choice(best_actions)
 
     def update_q_value(
@@ -76,9 +81,9 @@ class SimpleQLearner(Generic[State, Immutable]):
             # TODO: does 0.0 work? if so, what does it say about how the reward function should be structured?
             next_q_value = 0.0
         current_q_value = self.q_table[ir][action]
-        self.q_table[ir][action] = (
-            1 - self.alpha
-        ) * current_q_value + self.alpha * (reward + self.gamma * next_q_value)
+        self.q_table[ir][action] = (1 - self.alpha) * current_q_value + self.alpha * (
+            reward + self.gamma * next_q_value
+        )
 
     def get_actions_from_state(self, ir: Immutable) -> List[Action]:
         """
@@ -86,7 +91,7 @@ class SimpleQLearner(Generic[State, Immutable]):
         """
         legals = []
         actions = self.game.actions(self.game.from_immutable(ir))
-        for (a, status) in enumerate(actions):
+        for a, status in enumerate(actions):
             if status == VALID:
                 legals.append(a)
         return legals
