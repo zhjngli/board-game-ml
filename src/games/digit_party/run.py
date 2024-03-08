@@ -1,5 +1,6 @@
 from typing import List
 
+import pandas as pd
 from matplotlib import pyplot as plt
 from typing_extensions import override
 
@@ -112,17 +113,18 @@ class DigitPartyQTrainer(DigitParty, Trainer):
         self.reset()
 
 
-def trained_game(game_size: int) -> None:
+def q_trained_game(game_size: int) -> None:
     # there's too many states in default digit party, so naive q learning is inexhaustive and doesn't work well
-    # this type of naive training kinda maxes out at a 3x3 game, of around 60-65% of the max score.
+    # we can train a 3x3 game reasonably well, but it's very memory inefficient, since it needs to keep track
+    # of all possible digit party states. after 20 million games, the policy file is about 5 GB
     # for a 2x2 game, the result is trivially 100%
     q = DigitPartyQLearner(
         game_size,
-        q_pickle=f"src/games/digit_party/q-{game_size}x{game_size}.pkl",
+        q_pickle=f"src/games/digit_party/q-{game_size}x{game_size}-test.pkl",
         epsilon=0.5,
     )
     g = DigitPartyQTrainer(player=q, n=game_size)
-    g.train(episodes=1000000)
+    g.train(episodes=0)
 
     while not g.is_finished():
         print(f"\n{g.show_board()}\n")
@@ -139,12 +141,9 @@ def trained_game(game_size: int) -> None:
     print(f"theoretical max score: {g.theoretical_max_score()}")
     print(f"% of total: {100 * g.score / g.theoretical_max_score():.2f}")
 
-
-def many_trained_games(game_size: int, games=10000) -> None:
-    q = DigitPartyQLearner(
-        game_size, q_pickle=f"src/games/digit_party/q-{game_size}x{game_size}.pkl"
-    )
-    g = DigitPartyQTrainer(player=q, n=game_size)
+    # run a lot of games to get some data on the performance
+    games = 100_000
+    g.reset()
 
     score = 0
     theoretical_max = 0
@@ -166,15 +165,33 @@ def many_trained_games(game_size: int, games=10000) -> None:
             print(f"Episode {e}/{games}")
 
     percent = score / theoretical_max
-    average = percent_per_game / games
     print(f"played {games} games")
     print(f"achieved {100 * percent:.2f}% or {score}/{theoretical_max}")
-    print(f"averaged {100 * average:.2f}% of theoretical max")
 
-    plt.hist(percentages, bins=50)
+    df = pd.DataFrame({"percentages": percentages})
+    mean = df["percentages"].mean()
+    median = df["percentages"].median()
+    mode = df["percentages"].mode().values[0]
+
+    print(f"averaged {mean:.2f}% of theoretical max")
+    print(f"median: {median:.2f}%")
+    print(f"mode: {mode:.2f}%")
+
+    plt.hist(df, bins=50)
     plt.xticks(range(0, 101, 2))
-    plt.yticks(range(0, 2000, 50))
-    plt.title("games played per percent score")
+    plt.locator_params(axis="x", nbins=100)
+    plt.title("games played per percent score (untrained)")
     plt.xlabel("percent score")
     plt.ylabel("number of games")
+    plt.axvline(mean, color="r", linestyle="--", label="Mean")
+    plt.axvline(median, color="g", linestyle="-", label="Median")
+    plt.axvline(mode, color="b", linestyle="-", label="Mode")
+    plt.legend(
+        {
+            f"Mean: {mean:.2f}%": mean,
+            f"Median: {median:.2f}%": median,
+            f"Mode: {mode:.2f}%": mode,
+        }
+    )
+    plt.grid()
     plt.show()

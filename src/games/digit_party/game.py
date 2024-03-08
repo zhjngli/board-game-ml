@@ -237,7 +237,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         # TODO: do this per placement instead of per board render. though it doesn't matter much since the game isn't meant to be played by users
         for r in range(len(matrix)):
             for c in range(len(matrix[0])):
-                if matrix[r][c] != Empty:
+                if isinstance(matrix[r][c], Digit):
                     continue
 
                 self._add_connection(r, c, matrix)
