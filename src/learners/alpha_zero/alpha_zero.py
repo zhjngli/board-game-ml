@@ -2,7 +2,6 @@ import os
 import pickle
 from abc import ABC
 from collections import deque
-from random import shuffle
 from typing import Callable, Deque, Generic, List, NamedTuple, Optional, Tuple
 
 import numpy as np
@@ -12,7 +11,8 @@ from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
 )
-from nn.neural_network import NeuralNetwork, Policy, Value
+from learners.alpha_zero.types import A0NNInput, A0NNOutput, Policy, Value
+from nn.neural_network import NeuralNetwork
 
 
 class A0Parameters(NamedTuple):
@@ -25,10 +25,6 @@ class A0Parameters(NamedTuple):
     training_hist_max_len: int
 
 
-# TODO: training data should really be a tuple of neural network inputs and outputs.
-# in the current scheme, (Board, Policy, Value), only captures the type of games s.t.
-# the neural network input is the board, and the output is the policy and value.
-# Other games can potentially have other input that's not fully captured in the board.
 class AlphaZero(ABC, Generic[State, Immutable]):
     """
     Combines a neural network with Monte Carlo Tree Search to increase training efficiency and reduce memory required for training.
@@ -37,16 +33,18 @@ class AlphaZero(ABC, Generic[State, Immutable]):
     def __init__(
         self,
         game: Game[State, Immutable],
-        nn: NeuralNetwork,
+        nn: NeuralNetwork[State, A0NNInput, A0NNOutput],
         params: A0Parameters,
         m_params: MCTSParameters,
         training_examples_folder: str,
     ) -> None:
         self.game = game
         self.nn = nn  # current neural network
-        self.pn = nn  # previous neural network for self-play. TODO: some other form of previous?
+        self.pn = self.nn.__class__(
+            self.nn.model_folder
+        )  # previous neural network for self-play
         self.m = MonteCarloTreeSearch(self.game, self.nn, m_params)
-        self.training_history: List[Deque[Tuple[Board, Policy, Value]]] = []
+        self.training_history: List[Deque[Tuple[A0NNInput, A0NNOutput]]] = []
         self.training_examples_folder = training_examples_folder
 
         self.m_params = m_params
@@ -59,7 +57,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self.training_queue_length = params.training_queue_length
         self.training_hist_max_len = params.training_hist_max_len
 
-    def train_once(self) -> List[Tuple[Board, Policy, Value]]:
+    def train_once(self) -> List[Tuple[A0NNInput, A0NNOutput]]:
         self.game.reset()
 
         training_data: List[Tuple[Board, Player, Policy, Optional[Value]]] = []
@@ -85,7 +83,11 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         reward = self.game.calculate_reward(state)
         return [
-            (x[0], x[2], reward * ((-1) ** (x[1] != player))) for x in training_data
+            (
+                A0NNInput(board=x[0]),
+                A0NNOutput(policy=x[2], value=reward * ((-1) ** (x[1] != player))),
+            )
+            for x in training_data
         ]
 
     def train(self) -> None:
@@ -93,7 +95,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         for i in range(last_ep + 1, self.training_episodes + 1):
             # self play
-            self_play_data: Deque[Tuple[Board, Policy, Value]] = deque(
+            self_play_data: Deque[Tuple[A0NNInput, A0NNOutput]] = deque(
                 [], maxlen=self.training_queue_length
             )
             for _ in range(self.training_games_per_episode):
@@ -115,7 +117,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             training_data = [
                 d for game_data in self.training_history for d in game_data
             ]
-            shuffle(training_data)
+            # shuffle(training_data)  # can shuffle in nn.train()
             self.nn.train(training_data)
 
             # if model is good enough, keep it

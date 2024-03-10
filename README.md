@@ -38,6 +38,7 @@ Consider implementing the following games and train them using an appropriate me
 - clean up functions in Ultimate/TTT game classes. function names could be better, and ordering/structuring could be better
 - logging with verbose option
 - command line interface for running games with different learning methods
+- organize types
 
 ## References
 - [TicTacToe](https://github.com/ShangtongZhang/reinforcement-learning-an-introduction/blob/master/chapter01/tic_tac_toe.py) with a simple Monte Carlo learning implementation

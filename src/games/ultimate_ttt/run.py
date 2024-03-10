@@ -24,17 +24,21 @@ from games.game import P1, P2, VALID
 from games.ultimate_ttt.ultimate import (
     Location,
     Section,
-    UltimateBoard,
     UltimateIR,
     UltimateState,
     UltimateTicTacToe,
     ir_to_state,
 )
-from learners.alpha_zero.alpha_zero import A0Parameters, AlphaZero
+from learners.alpha_zero.alpha_zero import (
+    A0NNInput,
+    A0NNOutput,
+    A0Parameters,
+    AlphaZero,
+)
 from learners.alpha_zero.monte_carlo_tree_search import MCTSParameters
 from learners.monte_carlo import MonteCarloLearner
 from learners.trainer import Trainer
-from nn.neural_network import NeuralNetwork, Policy, Value
+from nn.neural_network import NeuralNetwork
 
 
 def human_game() -> None:
@@ -190,7 +194,7 @@ def monte_carlo_trained_game():
     print("\ngame over!")
 
 
-class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
+class UltimateNeuralNetwork(NeuralNetwork[UltimateState, A0NNInput, A0NNOutput]):
     NUM_CHANNELS = 1
     DROPOUT_RATE = 0.3
     LEARN_RATE = 0.01
@@ -250,23 +254,28 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
         )
         self.model.summary()
 
-    def train(self, data: List[Tuple[UltimateBoard, Policy, Value]]) -> None:
-        input_boards, target_pis, target_vs = list(zip(*data))
-        input_boards = np.asarray(input_boards)
-        target_pis = np.asarray(target_pis)
-        target_vs = np.asarray(target_vs)
+    def train(self, data: List[Tuple[A0NNInput, A0NNOutput]]) -> None:
+        inputs: List[A0NNInput]
+        outputs: List[A0NNOutput]
+        inputs, outputs = list(zip(*data))
+        input_boards = np.asarray([input.board for input in inputs])
+        target_pis = np.asarray([output.policy for output in outputs])
+        target_vs = np.asarray([output.value for output in outputs])
         self.model.fit(
             x=input_boards,
             y=[target_pis, target_vs],
             batch_size=self.BATCH_SIZE,
             epochs=self.EPOCHS,
+            shuffle=True,
         )
 
-    def predict(self, state: UltimateState) -> Tuple[Policy, Value]:
-        inputs = np.asarray([state.board])  # array of inputs, so add 1 to the dimension
+    def predict(self, states: List[UltimateState]) -> List[A0NNOutput]:
+        inputs = np.asarray(
+            [state.board for state in states]
+        )  # array of inputs, so add 1 to the dimension
         pis, vs = self.model.predict(inputs)
         # TODO: can i choose different predictions here?
-        return pis[0], vs[0]
+        return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
     def save(self, file: str) -> None:
         if not os.path.exists(self.model_folder):
@@ -278,6 +287,12 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState]):
     def load(self, file: str) -> None:
         model_path = os.path.join(self.model_folder, file)
         self.model.load_weights(model_path)
+
+    def set_weights(self, weights) -> None:
+        self.model.set_weights(weights)
+
+    def get_weights(self):
+        return self.model.get_weights()
 
 
 def alpha_zero_trained_game():

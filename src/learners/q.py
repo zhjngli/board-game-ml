@@ -65,6 +65,7 @@ class SimpleQLearner(Generic[StateType, ActionType], ABC):
         else:
             # if next_state is a terminal state (game end), then the best next q value is...?
             # TODO: does 0.0 work? if so, what does it say about how the reward function should be structured?
+            # TODO: should it be reward?
             next_q_value = 0.0
         current_q_value = self.q_table[state][action]
         self.q_table[state][action] = (

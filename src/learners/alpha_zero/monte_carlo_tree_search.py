@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from games.game import Action, ActionStatus, Game, Immutable, State
+from learners.alpha_zero.types import A0NNInput, A0NNOutput
 from nn.neural_network import NeuralNetwork
 
 
@@ -19,7 +20,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
     def __init__(
         self,
         game: Game[State, Immutable],
-        nn: NeuralNetwork,
+        nn: NeuralNetwork[State, A0NNInput, A0NNOutput],
         params: MCTSParameters,
     ) -> None:
         # q values for state-action pair
@@ -80,7 +81,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
             return -self.evs[ir]
 
         if ir not in self.ps:
-            self.ps[ir], v = self.nn.predict(state)
+            self.ps[ir], v = self.nn.predict([state])[0]
             valids = self.game.actions(state)
             self.ps[ir] = self.ps[ir] * valids
             policy_sum = np.sum(self.ps[ir])

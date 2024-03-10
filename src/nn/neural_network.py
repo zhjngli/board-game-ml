@@ -1,24 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import Generic, List, Tuple
+from typing import Generic, List, Tuple, TypeVar
 
-from numpy.typing import NDArray
-
-from games.game import Board, State
-
-Policy = NDArray  # TODO: one dimensional NDArray of arbitrary length
-Value = float
+State = TypeVar("State")
+Input = TypeVar("Input")
+Output = TypeVar("Output")
 
 
-class NeuralNetwork(ABC, Generic[State]):
+class NeuralNetwork(ABC, Generic[State, Input, Output]):
     def __init__(self, model_folder: str) -> None:
         self.model_folder = model_folder
 
     @abstractmethod
-    def train(self, data: List[Tuple[Board, Policy, Value]]) -> None:
+    def train(self, data: List[Tuple[Input, Output]]) -> None:
         pass
 
     @abstractmethod
-    def predict(self, state: State) -> Tuple[Policy, Value]:
+    def predict(self, inputs: List[State]) -> List[Output]:
         pass
 
     @abstractmethod
@@ -27,4 +24,12 @@ class NeuralNetwork(ABC, Generic[State]):
 
     @abstractmethod
     def load(self, file: str) -> None:
+        pass
+
+    @abstractmethod
+    def set_weights(self, weights) -> None:
+        pass
+
+    @abstractmethod
+    def get_weights(self):
         pass
