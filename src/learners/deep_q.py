@@ -71,24 +71,19 @@ class DeepQLearner(Generic[State, Immutable]):
                 score = self.game.calculate_reward(state)
 
                 action_statuses = np.asarray(self.game.actions(state))
+                valid_actions = np.where(action_statuses == VALID)[0]
                 if np.random.sample() < epsilon:
-                    valid_actions = np.where(action_statuses == VALID)[0]
                     a = np.random.choice(valid_actions)
                 else:
                     pi = self.predict_nn.predict([state])[0]
                     # get the maximum prediction of valid actions
                     a = np.argmax(pi * action_statuses)
+                    if not np.isin(valid_actions, a).any():
+                        # TODO: might be an issue with my model, not the implementation?
+                        # policy not robust enough, so when masked with action statuses it produces no valid actions
+                        a = np.random.choice(valid_actions)
 
-                try:
-                    next_state = self.game.apply(state, a)
-                except ValueError:
-                    # if there's an error for whatever reason
-                    # e.g. policy not robust enough, so when masked with action statuses it produces no valid actions
-                    # then choose a random valid action
-                    valid_actions = np.where(action_statuses == VALID)[0]
-                    a = np.random.choice(valid_actions)
-                    next_state = self.game.apply(state, a)
-
+                next_state = self.game.apply(state, a)
                 new_score = self.game.calculate_reward(next_state)
                 game_end = self.game.check_finished(next_state)
 

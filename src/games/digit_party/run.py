@@ -242,7 +242,7 @@ class DigitParty5x5NeuralNetwork(NeuralNetwork[DigitPartyState, Policy]):
     NUM_CHANNELS = 1
     NUM_FILTERS = 32
     DROPOUT_RATE = 0.3
-    LEARN_RATE = 0.01
+    LEARN_RATE = 0.03
     BATCH_SIZE = 64
     EPOCHS = 10
 
@@ -356,7 +356,7 @@ def deep_q_trained_game():
             memory_size=100,
             min_replay_size=100,
             minibatch_size=90,
-            training_episodes=100,
+            training_episodes=10,
             steps_to_train_longterm=5,
             steps_to_train_shortterm=1,
             steps_per_target_update=7,
