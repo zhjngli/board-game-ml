@@ -33,7 +33,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
     def __init__(
         self,
         game: Game[State, Immutable],
-        nn: NeuralNetwork[State, A0NNInput, A0NNOutput],
+        nn: NeuralNetwork[A0NNInput, A0NNOutput],
         params: A0Parameters,
         m_params: MCTSParameters,
         training_examples_folder: str,

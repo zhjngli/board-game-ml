@@ -20,7 +20,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
     def __init__(
         self,
         game: Game[State, Immutable],
-        nn: NeuralNetwork[State, A0NNInput, A0NNOutput],
+        nn: NeuralNetwork[A0NNInput, A0NNOutput],
         params: MCTSParameters,
     ) -> None:
         # q values for state-action pair
@@ -81,7 +81,10 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
             return -self.evs[ir]
 
         if ir not in self.ps:
-            self.ps[ir], v = self.nn.predict([state])[0]
+            out = self.nn.predict([A0NNInput(board=state.board)])[0]
+            self.ps[ir] = out.policy
+            v = out.value
+
             valids = self.game.actions(state)
             self.ps[ir] = self.ps[ir] * valids
             policy_sum = np.sum(self.ps[ir])

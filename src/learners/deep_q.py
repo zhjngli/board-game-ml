@@ -39,7 +39,7 @@ class DeepQLearner(Generic[State, Immutable]):
     def __init__(
         self,
         game: Game[State, Immutable],
-        nn: NeuralNetwork[State, State, Policy],
+        nn: NeuralNetwork[State, Policy],
         params: DeepQParameters,
     ) -> None:
         self.game = game
@@ -110,6 +110,7 @@ class DeepQLearner(Generic[State, Immutable]):
                 state = next_state
 
             # TODO: epsilon decay
+            # TODO: track efficiacy of learning (e.g. play some number of games and track score)
 
     def fit_nn(self, minibatch: NDArray) -> None:
         # minibatch is an array converted from: List[Tuple[State, Action, State, Reward, bool]]

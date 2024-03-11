@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Generic, List, Tuple, TypeVar
 
-State = TypeVar("State")
 Input = TypeVar("Input")
 Output = TypeVar("Output")
 
 
-class NeuralNetwork(ABC, Generic[State, Input, Output]):
+class NeuralNetwork(ABC, Generic[Input, Output]):
     def __init__(self, model_folder: str) -> None:
         self.model_folder = model_folder
 
@@ -15,7 +14,7 @@ class NeuralNetwork(ABC, Generic[State, Input, Output]):
         pass
 
     @abstractmethod
-    def predict(self, inputs: List[State]) -> List[Output]:
+    def predict(self, inputs: List[Input]) -> List[Output]:
         pass
 
     @abstractmethod

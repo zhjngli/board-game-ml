@@ -25,7 +25,6 @@ from games.ultimate_ttt.ultimate import (
     Location,
     Section,
     UltimateIR,
-    UltimateState,
     UltimateTicTacToe,
     ir_to_state,
 )
@@ -194,7 +193,7 @@ def monte_carlo_trained_game():
     print("\ngame over!")
 
 
-class UltimateNeuralNetwork(NeuralNetwork[UltimateState, A0NNInput, A0NNOutput]):
+class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
     NUM_CHANNELS = 1
     DROPOUT_RATE = 0.3
     LEARN_RATE = 0.01
@@ -269,12 +268,9 @@ class UltimateNeuralNetwork(NeuralNetwork[UltimateState, A0NNInput, A0NNOutput])
             shuffle=True,
         )
 
-    def predict(self, states: List[UltimateState]) -> List[A0NNOutput]:
-        inputs = np.asarray(
-            [state.board for state in states]
-        )  # array of inputs, so add 1 to the dimension
-        pis, vs = self.model.predict(inputs)
-        # TODO: can i choose different predictions here?
+    def predict(self, inputs: List[A0NNInput]) -> List[A0NNOutput]:
+        boards = np.asarray([i.board for i in inputs])
+        pis, vs = self.model.predict(boards)
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
     def save(self, file: str) -> None:
