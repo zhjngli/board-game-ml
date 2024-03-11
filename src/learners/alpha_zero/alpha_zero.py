@@ -189,6 +189,9 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         Loads latest model and returns latest training episode if training stops for whatever reason.
         """
         latest = 0
+        if not os.path.isdir(self.nn.model_folder):
+            return latest
+
         latest_model = None
         for filename in os.listdir(self.nn.model_folder):
             f = os.path.join(self.nn.model_folder, filename)
