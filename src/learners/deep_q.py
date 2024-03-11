@@ -11,8 +11,11 @@ from nn.neural_network import NeuralNetwork
 class DeepQParameters(NamedTuple):
     alpha: float
     gamma: float
-    epsilon: float
+    min_epsilon: float
+    max_epsilon: float
+    epsilon_decay: float
     memory_size: int
+    min_memory_size: int
     training_episodes: int
     steps_to_train_longterm: int
     steps_to_train_shortterm: int
@@ -49,6 +52,7 @@ class DeepQLearner(Generic[State, Immutable]):
             [], maxlen=params.memory_size
         )
 
+        self.min_memory_size = params.min_memory_size
         self.training_episodes = params.training_episodes
         self.steps_to_train_longterm = params.steps_to_train_longterm
         self.steps_to_train_shortterm = params.steps_to_train_shortterm
@@ -57,12 +61,15 @@ class DeepQLearner(Generic[State, Immutable]):
 
         self.alpha = params.alpha
         self.gamma = params.gamma
-        self.epsilon = params.epsilon
+        self.min_epsilon = params.min_epsilon
+        self.max_epsilon = params.max_epsilon
+        self.epsilon_decay = params.epsilon_decay
 
         self.rng = np.random.default_rng()
 
     def train(self) -> None:
         steps = 0
+        epsilon = self.max_epsilon
         for i in range(1, self.training_episodes + 1):
             self.game.reset()
             state = self.game.state()
@@ -72,7 +79,7 @@ class DeepQLearner(Generic[State, Immutable]):
 
                 score = self.game.calculate_reward(state)
 
-                if np.random.sample() < self.epsilon:
+                if np.random.sample() < epsilon:
                     action_statuses = self.game.actions(state)
                     valid_actions = np.where(action_statuses == 1)[0]
                     a = np.random.choice(valid_actions)
@@ -92,10 +99,10 @@ class DeepQLearner(Generic[State, Immutable]):
                 if steps % self.steps_to_train_shortterm == 0:
                     self.fit_nn(np.array([mem]))
 
-                # TODO: len(self.memory) > some other hyperparameter?
                 if (
                     steps % self.steps_to_train_longterm == 0
                     and len(self.memory) > self.minibatch_num
+                    and len(self.memory) > self.min_memory_size
                 ):
                     minibatch = self.rng.choice(
                         np.array(self.memory), size=self.minibatch_num, replace=False
@@ -109,8 +116,10 @@ class DeepQLearner(Generic[State, Immutable]):
                 self.predict_nn.save(f"ep_{i:07d}_model.h5")
                 state = next_state
 
-            # TODO: epsilon decay
-            # TODO: track efficiacy of learning (e.g. play some number of games and track score)
+            epsilon = self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(
+                -self.epsilon_decay * i
+            )
+            # TODO: track efficacy of learning (e.g. play some number of games and track score)
 
     def fit_nn(self, minibatch: NDArray) -> None:
         # minibatch is an array converted from: List[Tuple[State, Action, State, Reward, bool]]
