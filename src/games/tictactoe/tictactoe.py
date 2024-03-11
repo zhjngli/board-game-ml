@@ -5,10 +5,12 @@ from numpy.typing import NDArray
 from typing_extensions import override
 
 from games.game import (
+    INVAL,
     P1,
     P1WIN,
     P2,
     P2WIN,
+    VALID,
     Action,
     ActionStatus,
     BasicState,
@@ -186,9 +188,8 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
 
     @staticmethod
     def actions(state: TicTacToeState) -> List[ActionStatus]:
-        b = np.copy(state.board)
-        b[b == Empty] = 1
-        b[b != Empty] = 0
+        mask = state.board == Empty
+        b = np.where(mask, VALID, INVAL)
         return list(b.reshape(TicTacToe.num_actions()))
 
     @staticmethod

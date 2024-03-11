@@ -188,7 +188,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         """
         Loads latest model and returns latest training episode if training stops for whatever reason.
         """
-        iteration = 1
+        latest = 0
         latest_model = None
         for filename in os.listdir(self.nn.model_folder):
             f = os.path.join(self.nn.model_folder, filename)
@@ -198,11 +198,11 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 except ValueError:
                     # best_model.h5 or temp_model.h5
                     continue
-                if i >= iteration:
-                    iteration = i
+                if i >= latest:
+                    latest = i
                     latest_model = f
 
         if latest_model:
             self.nn.load(latest_model)
             self.pn.load(latest_model)  # TODO: some other form of previous model?
-        return i
+        return latest

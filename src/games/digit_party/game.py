@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from games.digit_party.data import max_conns
-from games.game import P1, Action, ActionStatus, BasicState, Game, Player
+from games.game import INVAL, P1, VALID, Action, ActionStatus, BasicState, Game, Player
 
 """
 For more information about this game, see the following links:
@@ -145,6 +145,11 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         r = int(a / n)
         c = a % n
         DigitParty._check_range(n, r, c)
+        if state.board[r][c] != Empty:
+            raise ValueError(
+                f"Board already contains tile {state.board[r][c]} at row"
+                f" {r} column {c}"
+            )
 
         d = state.digits.pop()
         state.board[r][c] = d
@@ -174,7 +179,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
 
     @staticmethod
     def check_finished(state: DigitPartyState) -> bool:
-        return bool(np.all([state != 0]))
+        return bool(np.all([state.board != 0]))
 
     def _intersperse_board(self) -> List[List[Digit | str]]:
         """
@@ -298,9 +303,8 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
 
     @staticmethod
     def actions(state: DigitPartyState) -> List[ActionStatus]:
-        b = np.copy(state.board)
-        b[b == 0] = 1
-        b[b != 0] = 0
+        mask = state.board == Empty
+        b = np.where(mask, VALID, INVAL)
         return list(b.reshape(state.board.size))
 
     def num_actions(self) -> int:

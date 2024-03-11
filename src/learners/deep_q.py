@@ -1,10 +1,11 @@
+import os
 from collections import deque
 from typing import Deque, Generic, NamedTuple, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
 
-from games.game import Action, Game, Immutable, State
+from games.game import VALID, Action, Game, Immutable, State
 from nn.neural_network import NeuralNetwork
 
 
@@ -15,27 +16,16 @@ class DeepQParameters(NamedTuple):
     max_epsilon: float
     epsilon_decay: float
     memory_size: int
-    min_memory_size: int
+    min_replay_size: int
+    minibatch_size: int
     training_episodes: int
     steps_to_train_longterm: int
     steps_to_train_shortterm: int
     steps_per_target_update: int
-    minibatch_num: int
-
-
-class DeepQInput(NamedTuple, Generic[State]):
-    state: State
-    action: Action
-    next_state: State
-    reward: float
 
 
 Policy = NDArray  # TODO: one dimensional NDArray of arbitrary length
 Reward = float
-
-
-class DeepQOutput(NamedTuple):
-    policy: Policy
 
 
 class DeepQLearner(Generic[State, Immutable]):
@@ -52,12 +42,12 @@ class DeepQLearner(Generic[State, Immutable]):
             [], maxlen=params.memory_size
         )
 
-        self.min_memory_size = params.min_memory_size
+        self.min_replay_size = params.min_replay_size
+        self.minibatch_size = params.minibatch_size
         self.training_episodes = params.training_episodes
         self.steps_to_train_longterm = params.steps_to_train_longterm
         self.steps_to_train_shortterm = params.steps_to_train_shortterm
         self.steps_per_target_update = params.steps_per_target_update
-        self.minibatch_num = params.minibatch_num
 
         self.alpha = params.alpha
         self.gamma = params.gamma
@@ -68,9 +58,10 @@ class DeepQLearner(Generic[State, Immutable]):
         self.rng = np.random.default_rng()
 
     def train(self) -> None:
+        latest_ep = self.load_latest_model()
         steps = 0
         epsilon = self.max_epsilon
-        for i in range(1, self.training_episodes + 1):
+        for i in range(latest_ep + 1, self.training_episodes + 1):
             self.game.reset()
             state = self.game.state()
 
@@ -79,15 +70,25 @@ class DeepQLearner(Generic[State, Immutable]):
 
                 score = self.game.calculate_reward(state)
 
+                action_statuses = np.asarray(self.game.actions(state))
                 if np.random.sample() < epsilon:
-                    action_statuses = self.game.actions(state)
-                    valid_actions = np.where(action_statuses == 1)[0]
+                    valid_actions = np.where(action_statuses == VALID)[0]
                     a = np.random.choice(valid_actions)
                 else:
                     pi = self.predict_nn.predict([state])[0]
-                    a = np.argmax(pi)
+                    # get the maximum prediction of valid actions
+                    a = np.argmax(pi * action_statuses)
 
-                next_state = self.game.apply(state, a)
+                try:
+                    next_state = self.game.apply(state, a)
+                except ValueError:
+                    # if there's an error for whatever reason
+                    # e.g. policy not robust enough, so when masked with action statuses it produces no valid actions
+                    # then choose a random valid action
+                    valid_actions = np.where(action_statuses == VALID)[0]
+                    a = np.random.choice(valid_actions)
+                    next_state = self.game.apply(state, a)
+
                 new_score = self.game.calculate_reward(next_state)
                 game_end = self.game.check_finished(next_state)
 
@@ -101,11 +102,11 @@ class DeepQLearner(Generic[State, Immutable]):
 
                 if (
                     steps % self.steps_to_train_longterm == 0
-                    and len(self.memory) > self.minibatch_num
-                    and len(self.memory) > self.min_memory_size
+                    and len(self.memory) > self.minibatch_size
+                    and len(self.memory) > self.min_replay_size
                 ):
                     minibatch = self.rng.choice(
-                        np.array(self.memory), size=self.minibatch_num, replace=False
+                        np.array(self.memory), size=self.minibatch_size, replace=False
                     )
                     self.fit_nn(minibatch)
 
@@ -143,3 +144,26 @@ class DeepQLearner(Generic[State, Immutable]):
 
         # TODO: make train type signature flexible so i don't have to convert to list?
         self.predict_nn.train(list(zip(states, qs)))
+
+    def load_latest_model(self) -> int:
+        """
+        Loads latest model and returns latest training episode if training stops for whatever reason.
+        """
+        latest = 0
+        latest_model = None
+        for filename in os.listdir(self.predict_nn.model_folder):
+            f = os.path.join(self.predict_nn.model_folder, filename)
+            if os.path.isfile(f):
+                try:
+                    i = int(filename.split("_")[1])  # ep_0001_model.h5
+                except ValueError:
+                    # any other model
+                    continue
+                if i >= latest:
+                    latest = i
+                    latest_model = f
+
+        if latest_model:
+            self.predict_nn.load(latest_model)
+            self.target_nn.load(latest_model)
+        return latest
