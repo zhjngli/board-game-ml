@@ -1,6 +1,6 @@
 import os
 import pathlib
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -86,6 +86,82 @@ def human_game() -> None:
     print(f"% of total: {100 * game.score / game.theoretical_max_score()}")
 
 
+def computer_game(
+    g: DigitParty,
+    num_games: int,
+    play: Callable[[DigitPartyState], DigitPartyPlacement],
+) -> None:
+    g.reset()
+    while not g.is_finished():
+        print(f"\n{g.show_board()}\n")
+        curr_digit, next_digit = g.next_digits()
+        print(f"current digit: {curr_digit}")
+        print(f"next digit: {next_digit}")
+        r, c = play(g.state())
+        g.place(r, c)
+        print(f"\ncomputer plays {curr_digit} at ({r}, {c})!")
+
+    print(g.show_board())
+    print("game finished!")
+    print(f"computer score: {g.score}")
+    print(f"theoretical max score: {g.theoretical_max_score()}")
+    print(f"% of total: {100 * g.score / g.theoretical_max_score():.2f}")
+
+    # run a lot of games to get some data on the performance
+    g.reset()
+
+    score = 0
+    theoretical_max = 0
+    percent_per_game = 0.0
+    percentages = []
+    for e in range(1, num_games + 1):
+        while not g.is_finished():
+            r, c = play(g.state())
+            g.place(r, c)
+
+        score += g.score
+        t_max = g.theoretical_max_score()
+        theoretical_max += t_max
+        percent_per_game += g.score / t_max
+        percentages.append(100 * g.score / t_max)
+        g.reset()
+
+        if e % 1000 == 0:
+            print(f"Episode {e}/{num_games}")
+
+    percent = score / theoretical_max
+    print(f"played {num_games} games")
+    print(f"achieved {100 * percent:.2f}% or {score}/{theoretical_max}")
+
+    df = pd.DataFrame({"percentages": percentages})
+    mean = df["percentages"].mean()
+    median = df["percentages"].median()
+    mode = df["percentages"].mode().values[0]
+
+    print(f"averaged {mean:.2f}% of theoretical max")
+    print(f"median: {median:.2f}%")
+    print(f"mode: {mode:.2f}%")
+
+    plt.hist(df, bins=50)
+    plt.xticks(range(0, 101, 2))
+    plt.locator_params(axis="x", nbins=100)
+    plt.title("games played per percent score")
+    plt.xlabel("percent score")
+    plt.ylabel("number of games")
+    plt.axvline(mean, color="r", linestyle="--", label="Mean")
+    plt.axvline(median, color="g", linestyle="-", label="Median")
+    plt.axvline(mode, color="b", linestyle="-", label="Mode")
+    plt.legend(
+        {
+            f"Mean: {mean:.2f}%": mean,
+            f"Median: {median:.2f}%": median,
+            f"Mode: {mode:.2f}%": mode,
+        }
+    )
+    plt.grid()
+    plt.show()
+
+
 class DigitPartyQLearner(SimpleQLearner[DigitPartyIR, DigitPartyPlacement]):
     def __init__(
         self, n: int, q_pickle: str = "", alpha=0.1, gamma=0.9, epsilon=0.1
@@ -153,75 +229,10 @@ def q_trained_game(game_size: int) -> None:
     g = DigitPartyQTrainer(player=q, n=game_size)
     g.train(episodes=0)
 
-    while not g.is_finished():
-        print(f"\n{g.show_board()}\n")
-        curr_digit, next_digit = g.next_digits()
-        print(f"current digit: {curr_digit}")
-        print(f"next digit: {next_digit}")
-        r, c = q.choose_action(g.to_immutable(g.state()), exploit=True)
-        g.place(r, c)
-        print(f"\ncomputer plays {curr_digit} at ({r}, {c})!")
+    def q_play(state: DigitPartyState) -> DigitPartyPlacement:
+        return q.choose_action(g.to_immutable(state), exploit=True)
 
-    print(g.show_board())
-    print("game finished!")
-    print(f"computer score: {g.score}")
-    print(f"theoretical max score: {g.theoretical_max_score()}")
-    print(f"% of total: {100 * g.score / g.theoretical_max_score():.2f}")
-
-    # run a lot of games to get some data on the performance
-    games = 100_000
-    g.reset()
-
-    score = 0
-    theoretical_max = 0
-    percent_per_game = 0.0
-    percentages = []
-    for e in range(1, games + 1):
-        while not g.is_finished():
-            r, c = q.choose_action(g.to_immutable(g.state()), exploit=True)
-            g.place(r, c)
-
-        score += g.score
-        t_max = g.theoretical_max_score()
-        theoretical_max += t_max
-        percent_per_game += g.score / t_max
-        percentages.append(100 * g.score / t_max)
-        g.reset()
-
-        if e % 1000 == 0:
-            print(f"Episode {e}/{games}")
-
-    percent = score / theoretical_max
-    print(f"played {games} games")
-    print(f"achieved {100 * percent:.2f}% or {score}/{theoretical_max}")
-
-    df = pd.DataFrame({"percentages": percentages})
-    mean = df["percentages"].mean()
-    median = df["percentages"].median()
-    mode = df["percentages"].mode().values[0]
-
-    print(f"averaged {mean:.2f}% of theoretical max")
-    print(f"median: {median:.2f}%")
-    print(f"mode: {mode:.2f}%")
-
-    plt.hist(df, bins=50)
-    plt.xticks(range(0, 101, 2))
-    plt.locator_params(axis="x", nbins=100)
-    plt.title("games played per percent score (untrained)")
-    plt.xlabel("percent score")
-    plt.ylabel("number of games")
-    plt.axvline(mean, color="r", linestyle="--", label="Mean")
-    plt.axvline(median, color="g", linestyle="-", label="Median")
-    plt.axvline(mode, color="b", linestyle="-", label="Mode")
-    plt.legend(
-        {
-            f"Mean: {mean:.2f}%": mean,
-            f"Median: {median:.2f}%": median,
-            f"Mode: {mode:.2f}%": mode,
-        }
-    )
-    plt.grid()
-    plt.show()
+    computer_game(g, 100_000, q_play)
 
 
 # each digit party needs its own neural network I guess since the board is a different shape
@@ -352,3 +363,15 @@ def deep_q_trained_game():
         ),
     )
     deepq.train()
+
+    def deepq_play(state: DigitPartyState) -> DigitPartyPlacement:
+        pi = nn.predict([state])
+        print("nn chose pi: ", pi)
+        a = np.argmax(pi)
+        n = state.board.shape[0]
+        r = int(a / n)
+        c = int(a % n)
+        return r, c
+
+    g = DigitParty(n=5)
+    computer_game(g, 100, deepq_play)

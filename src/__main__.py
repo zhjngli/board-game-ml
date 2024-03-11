@@ -1,7 +1,9 @@
 # from games.digit_party.run import human_game as digit_party_human_game
-# from games.digit_party.run import q_trained_game as digit_party_trained_game
 
 # digit_party_human_game()
+
+# from games.digit_party.run import q_trained_game as digit_party_trained_game
+
 # digit_party_trained_game(game_size=3)
 
 # from games.random_walk.random_walk import q_trained_game as random_walk_trained_game
