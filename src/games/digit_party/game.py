@@ -36,11 +36,13 @@ class DigitPartyState(BasicState):
         player: Player,
         next: Tuple[Digit | None, Digit | None],
         score: int,
+        theoretical_max: int,
         digits: List[Digit],
     ) -> None:
         super().__init__(board, player)
         self.next = next
         self.score = score
+        self.theoretical_max = theoretical_max
         # digits not intended to be used for training
         self.digits = digits
 
@@ -69,6 +71,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             self.digits: List[Digit] = list(map(lambda d: Digit(d), digits))
         else:
             self.digits = [Digit(random.randint(1, self.max_num)) for _ in range(n * n)]
+        self.theoretical_max = DigitParty.calculate_theoretical_max(self.digits)
         self.placements: List[Tuple[Tuple[int, int], Digit]] = []
         self.score = 0
 
@@ -76,16 +79,21 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         self.digits = [
             Digit(random.randint(1, self.max_num)) for _ in range(self.n * self.n)
         ]
+        self.theoretical_max = DigitParty.calculate_theoretical_max(self.digits)
         self.board = np.zeros((self.n, self.n))
         self.placements = []
         self.score = 0
 
     def theoretical_max_score(self) -> int:
-        score = 0
-        counts = Counter(list(map(lambda p: p[1], self.placements)))
+        return self.theoretical_max
+
+    @staticmethod
+    def calculate_theoretical_max(digits: List[Digit]) -> int:
+        theoretical_max = 0
+        counts = Counter(digits)
         for d in counts:
-            score += max_conns[counts[d]] * d
-        return score
+            theoretical_max += max_conns[counts[d]] * d
+        return theoretical_max
 
     @staticmethod
     def _check_range(n: int, r: int, c: int) -> None:
@@ -138,6 +146,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             player=s.player,
             next=s.next,
             score=s.score,
+            theoretical_max=s.theoretical_max,
             digits=copy.deepcopy(s.digits),
         )
         shape = state.board.shape
@@ -294,6 +303,7 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
             next=self.next_digits(),
             score=self.score,
             digits=self.digits,
+            theoretical_max=self.theoretical_max,
         )
 
     @staticmethod
@@ -324,5 +334,5 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
 
     @staticmethod
     def calculate_reward(state: DigitPartyState) -> float:
-        # TODO: should this be difference between current score and previous score?
-        return state.score
+        # scale score by theoretical max to incentivize agent to move towards theoretical max
+        return state.score / state.theoretical_max

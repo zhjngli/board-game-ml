@@ -270,7 +270,7 @@ class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
 
     def predict(self, inputs: List[A0NNInput]) -> List[A0NNOutput]:
         boards = np.asarray([i.board for i in inputs])
-        pis, vs = self.model.predict(boards)
+        pis, vs = self.model.predict(boards, verbose=0)
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
     def save(self, file: str) -> None:

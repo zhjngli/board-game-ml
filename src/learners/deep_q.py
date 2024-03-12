@@ -19,6 +19,7 @@ class DeepQParameters(NamedTuple):
     min_replay_size: int
     minibatch_size: int
     training_episodes: int
+    episodes_per_model_save: int
     steps_to_train_longterm: int
     steps_to_train_shortterm: int
     steps_per_target_update: int
@@ -45,6 +46,7 @@ class DeepQLearner(Generic[State, Immutable]):
         self.min_replay_size = params.min_replay_size
         self.minibatch_size = params.minibatch_size
         self.training_episodes = params.training_episodes
+        self.episodes_per_model_save = params.episodes_per_model_save
         self.steps_to_train_longterm = params.steps_to_train_longterm
         self.steps_to_train_shortterm = params.steps_to_train_shortterm
         self.steps_per_target_update = params.steps_per_target_update
@@ -70,6 +72,7 @@ class DeepQLearner(Generic[State, Immutable]):
 
                 score = self.game.calculate_reward(state)
 
+                # epsilon greedy
                 action_statuses = np.asarray(self.game.actions(state))
                 valid_actions = np.where(action_statuses == VALID)[0]
                 if np.random.sample() < epsilon:
@@ -80,6 +83,7 @@ class DeepQLearner(Generic[State, Immutable]):
                     a = np.argmax(pi * action_statuses)
                     if not np.isin(valid_actions, a).any():
                         # TODO: might be an issue with my model, not the implementation?
+                        # TODO: punish invalid actions?
                         # policy not robust enough, so when masked with action statuses it produces no valid actions
                         a = np.random.choice(valid_actions)
 
@@ -92,8 +96,9 @@ class DeepQLearner(Generic[State, Immutable]):
                 self.memory.append(mem)
 
                 # fit models
-                if steps % self.steps_to_train_shortterm == 0:
-                    self.fit_nn(np.array([mem]))
+                # TODO: probably get rid of this altogether?
+                # if steps % self.steps_to_train_shortterm == 0:
+                #     self.fit_nn(np.array([mem]))
 
                 if (
                     steps % self.steps_to_train_longterm == 0
@@ -109,12 +114,15 @@ class DeepQLearner(Generic[State, Immutable]):
                 if steps % self.steps_per_target_update == 0:
                     self.target_nn.set_weights(self.predict_nn.get_weights())
 
-                self.predict_nn.save(f"ep_{i:07d}_model.h5")
+                if i % self.episodes_per_model_save == 0:
+                    self.predict_nn.save(f"ep_{i:07d}_model.h5")
+
                 state = next_state
 
             epsilon = self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(
                 -self.epsilon_decay * i
             )
+            # TODO: save and load memory for iterative training
             # TODO: track efficacy of learning (e.g. play some number of games and track score)
 
     def fit_nn(self, minibatch: NDArray) -> None:
