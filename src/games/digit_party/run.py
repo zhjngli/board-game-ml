@@ -268,10 +268,10 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyState, Policy]):
         flat = Flatten()(conv2)
         concat = Concatenate()([flat, input_curr_digit, input_next_digit])
         dense1 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(128)(concat)))
+            Activation("relu")(BatchNormalization(axis=1)(Dense(256)(concat)))
         )
         dense2 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(64)(dense1)))
+            Activation("relu")(BatchNormalization(axis=1)(Dense(128)(dense1)))
         )
 
         # policy, guessing the value of each valid action at the input state
@@ -344,7 +344,7 @@ def deep_q_3x3_trained_game():
         DigitParty(n=3),
         nn,
         DeepQParameters(
-            alpha=0.001,
+            alpha=0.01,
             gamma=0.618,
             min_epsilon=0.5,
             max_epsilon=1,
@@ -352,12 +352,14 @@ def deep_q_3x3_trained_game():
             memory_size=100_000,
             min_replay_size=1000,
             minibatch_size=32,
-            training_episodes=3000,  # 9 * eps total steps
+            training_episodes=10000,  # 9 * eps total steps
             episodes_per_model_save=100,
+            episodes_per_memory_save=100,
             steps_to_train_longterm=1000,  # (steps / 9) episodes before training longterm
             steps_to_train_shortterm=1,
             steps_per_target_update=1000,  # (steps / 9) episodes before updating target network
         ),
+        memory_folder=f"{cur_dir}/deepq_3x3_memory/",
     )
     deepq.train()
 

@@ -1,4 +1,5 @@
 import os
+import pickle
 from collections import deque
 from typing import Deque, Generic, NamedTuple, Tuple
 
@@ -20,6 +21,7 @@ class DeepQParameters(NamedTuple):
     minibatch_size: int
     training_episodes: int
     episodes_per_model_save: int
+    episodes_per_memory_save: int
     steps_to_train_longterm: int
     steps_to_train_shortterm: int
     steps_per_target_update: int
@@ -35,6 +37,7 @@ class DeepQLearner(Generic[State, Immutable]):
         game: Game[State, Immutable],
         nn: NeuralNetwork[State, Policy],
         params: DeepQParameters,
+        memory_folder: str,
     ) -> None:
         self.game = game
         self.predict_nn = nn
@@ -42,11 +45,15 @@ class DeepQLearner(Generic[State, Immutable]):
         self.memory: Deque[Tuple[State, Action, State, Reward, bool]] = deque(
             [], maxlen=params.memory_size
         )
+        self.memory_folder = memory_folder
 
         self.min_replay_size = params.min_replay_size
         self.minibatch_size = params.minibatch_size
+
         self.training_episodes = params.training_episodes
         self.episodes_per_model_save = params.episodes_per_model_save
+        self.episodes_per_memory_save = params.episodes_per_memory_save
+
         self.steps_to_train_longterm = params.steps_to_train_longterm
         self.steps_to_train_shortterm = params.steps_to_train_shortterm
         self.steps_per_target_update = params.steps_per_target_update
@@ -60,7 +67,9 @@ class DeepQLearner(Generic[State, Immutable]):
         self.rng = np.random.default_rng()
 
     def train(self) -> None:
+        self.load_memory()
         latest_ep = self.load_latest_model()
+
         steps = 0
         epsilon = self.max_epsilon
         for i in range(latest_ep + 1, self.training_episodes + 1):
@@ -122,7 +131,10 @@ class DeepQLearner(Generic[State, Immutable]):
             epsilon = self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(
                 -self.epsilon_decay * i
             )
-            # TODO: save and load memory for iterative training
+
+            if i % self.episodes_per_memory_save == 0:
+                self.save_memory(f"ep_{i:07d}_memory.pkl")
+
             # TODO: track efficacy of learning (e.g. play some number of games and track score)
 
     def fit_nn(self, minibatch: NDArray) -> None:
@@ -173,3 +185,34 @@ class DeepQLearner(Generic[State, Immutable]):
             self.predict_nn.load(latest_model)
             self.target_nn.load(latest_model)
         return latest
+
+    def save_memory(self, memory_file: str) -> None:
+        if not os.path.exists(self.memory_folder):
+            print(f"Making directory for play memory at: {self.memory_folder}")
+            os.makedirs(self.memory_folder)
+
+        memory_path = os.path.join(self.memory_folder, memory_file)
+        with open(memory_path, "wb") as f:
+            pickle.dump(self.memory, f)
+
+    def load_memory(self) -> None:
+        if not os.path.isdir(self.memory_folder):
+            return
+
+        latest = 0
+        latest_memory = None
+        for filename in os.listdir(self.memory_folder):
+            f = os.path.join(self.memory_folder, filename)
+            if os.path.isfile(f):
+                try:
+                    i = int(filename.split("_")[1])  # ep_0001_memory.pkl
+                except ValueError:
+                    # any other memory
+                    continue
+                if i >= latest:
+                    latest = i
+                    latest_memory = f
+
+        if latest_memory:
+            with open(latest_memory, "rb") as file:
+                self.memory = pickle.load(file)
