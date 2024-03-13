@@ -10,11 +10,15 @@ All policy files are saved locally, so cloning the repo fresh will require train
 
 ### ML methods
 
+The following two methods currently use native python, without any fancy libraries or frameworks. It's inefficient, but forces me to consider the details.
+
 - Simple [Q-learning](src/learners/q.py), which attempts to track the whole q-table. As opposed to deep q-learning which uses a neural network to guess the best possible action given a state. Works well when rewards can be calculated per action.
 - [Monte carlo](src/learners/monte_carlo.py) learning. Works for episodic rewards, where the value of each state/action is primarily determined after the game is complete. Stores all the states that it's explored, and the associated value of each state.
-- [Alpha Zero](src/learners/alpha_zero/). Combines a neural network with monte carlo tree search so that the training is more optimized. Only needs to store the neural network weights (and self-play training examples, if preferred), so it's much more memory efficient than storing all the explored states.
 
-Both of these methods currently use native python, without any fancy libraries or frameworks. It's inefficient, but forces me to consider the details.
+The next two methods use a form of deep reinforcement learning with the introduction of neural networks.
+
+- [Alpha Zero](src/learners/alpha_zero/). Combines a neural network with monte carlo tree search so that the training is more optimized. Only needs to store the neural network weights (and self-play training examples, if preferred), so it's much more memory efficient than storing all the explored states.
+- [Deep Q Learning](src/learners/deep_q.py). Similar to q-learning, but it replaces the q-table with a neural network, drastically reducing the memory usage.
 
 ### Games
 - A [random walk game](src/games/random_walk/random_walk.py) which scores points at the right bound and loses points at the left bound. This is trained with q-learning and a monte carlo method.
@@ -29,9 +33,6 @@ Both of these methods currently use native python, without any fancy libraries o
 Consider implementing the following games and train them using an appropriate method:
 - [nim](https://en.wikipedia.org/wiki/Nim)
 - [photosynthesis](https://boardgamegeek.com/boardgame/218603/photosynthesis)
-
-#### ML Methods
-- deep q-learning
 
 #### Tech features/infra
 - refactor simple q and monte-carlo learners to use composition rather than inheritance. been lazy to do this
