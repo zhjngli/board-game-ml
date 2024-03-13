@@ -177,7 +177,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         )
 
     @staticmethod
-    def _is_win(p: Player, board: UltimateBoard) -> bool:
+    def _3_in_a_row(p: Player, board: UltimateBoard) -> bool:
         # fmt: off
         return (
             # horizontal
@@ -193,6 +193,29 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
             (TicTacToe._is_win(p, board[2][0]) and TicTacToe._is_win(p, board[1][1]) and TicTacToe._is_win(p, board[0][2]))
         )
         # fmt: on
+
+    @staticmethod
+    def _is_win(p: Player, board: UltimateBoard) -> bool:
+        threeinarow = UltimateTicTacToe._3_in_a_row(p, board)
+        if threeinarow:
+            return threeinarow
+
+        opp = switch_player(p)
+        if UltimateTicTacToe._3_in_a_row(opp, board):
+            return False
+
+        # if no one has 3 in a row, check if p has more mini wins
+        p_wins = 0
+        opp_wins = 0
+        for r in range(3):
+            for c in range(3):
+                print(board[r][c])
+                if TicTacToe._is_win(p, board[r][c]):
+                    p_wins += 1
+                if TicTacToe._is_win(opp, board[r][c]):
+                    opp_wins += 1
+
+        return p_wins > opp_wins
 
     def win(self, p: Player) -> bool:
         return self._is_win(p, self.board)
