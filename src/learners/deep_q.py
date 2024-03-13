@@ -1,3 +1,4 @@
+import copy
 import os
 import pickle
 from collections import deque
@@ -66,78 +67,94 @@ class DeepQLearner(Generic[State, Immutable]):
 
         self.rng = np.random.default_rng()
 
+    def calculate_epsilon(self, episode: int) -> float:
+        return self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(
+            -self.epsilon_decay * episode
+        )
+
     def train(self) -> None:
         self.load_memory()
         latest_ep = self.load_latest_model()
 
-        steps = 0
-        epsilon = self.max_epsilon
+        self.steps = 0
+        self.epsilon = self.calculate_epsilon(latest_ep)
         for i in range(latest_ep + 1, self.training_episodes + 1):
-            self.game.reset()
-            state = self.game.state()
+            self.run_game_once()
 
-            while not self.game.check_finished(state):
-                steps += 1
+            self.epsilon = self.calculate_epsilon(i)
 
-                score = self.game.calculate_reward(state)
-
-                # epsilon greedy
-                action_statuses = np.asarray(self.game.actions(state))
-                valid_actions = np.where(action_statuses == VALID)[0]
-                if np.random.sample() < epsilon:
-                    a = np.random.choice(valid_actions)
-                else:
-                    pi = self.predict_nn.predict([state])[0]
-                    # get the maximum prediction of valid actions
-                    a = np.argmax(pi * action_statuses)
-                    if not np.isin(valid_actions, a).any():
-                        # TODO: might be an issue with my model, not the implementation?
-                        # TODO: punish invalid actions?
-                        # policy not robust enough, so when masked with action statuses it produces no valid actions
-                        a = np.random.choice(valid_actions)
-
-                next_state = self.game.apply(state, a)
-                new_score = self.game.calculate_reward(next_state)
-                game_end = self.game.check_finished(next_state)
-
-                reward = new_score - score
-                mem = (state, a, next_state, reward, game_end)
-                self.memory.append(mem)
-
-                # fit models
-                # TODO: probably get rid of this altogether?
-                # if steps % self.steps_to_train_shortterm == 0:
-                #     self.fit_nn(np.array([mem]))
-
-                if (
-                    steps % self.steps_to_train_longterm == 0
-                    and len(self.memory) > self.minibatch_size
-                    and len(self.memory) > self.min_replay_size
-                ):
-                    minibatch = self.rng.choice(
-                        np.array(self.memory), size=self.minibatch_size, replace=False
-                    )
-                    self.fit_nn(minibatch)
-
-                # update target network weights
-                if steps % self.steps_per_target_update == 0:
-                    self.target_nn.set_weights(self.predict_nn.get_weights())
-
-                if i % self.episodes_per_model_save == 0:
-                    self.predict_nn.save(f"ep_{i:07d}_model.h5")
-
-                state = next_state
-
-            epsilon = self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(
-                -self.epsilon_decay * i
-            )
+            if i % self.episodes_per_model_save == 0:
+                self.predict_nn.save(f"ep_{i:07d}_model.h5")
 
             if i % self.episodes_per_memory_save == 0:
                 self.save_memory(f"ep_{i:07d}_memory.pkl")
 
             # TODO: track efficacy of learning (e.g. play some number of games and track score)
 
-    def fit_nn(self, minibatch: NDArray) -> None:
+    def run_game_once(self) -> None:
+        self.game.reset()
+        state = self.game.state()
+
+        while not self.game.check_finished(state):
+            self.steps += 1
+
+            score = self.game.calculate_reward(state)
+            # print(f"state:\n{state.board}")
+            # print(f"next: {state.next}")  # type: ignore
+
+            # epsilon greedy
+            action_statuses = np.asarray(self.game.actions(state))
+            # valid_actions = np.where(action_statuses == VALID)[0]
+            if np.random.sample() < self.epsilon:
+                a = np.random.choice(len(action_statuses))
+            else:
+                pi = self.predict_nn.predict([state])[0]
+                a = int(np.argmax(pi))
+                # if not np.isin(valid_actions, a).any():
+                #     # TODO: might be an issue with my model, not the implementation?
+                #     # TODO: punish invalid actions?
+                #     # policy not robust enough, so when masked with action statuses it produces no valid actions
+                #     a = np.random.choice(valid_actions)
+                #     print(f"invalid, chose {a} randomly")
+
+            # calculations based on action chosen
+            # TODO: very sparse rewards, only at game end
+            try:
+                next_state = self.game.apply(state, a)
+                new_score = self.game.calculate_reward(next_state)
+                reward = new_score - score
+                game_end = self.game.check_finished(next_state)
+            except ValueError:
+                # punish invalid actions
+                next_state = copy.deepcopy(state)
+                reward = 0
+                game_end = False
+
+            mem = (state, a, next_state, reward, game_end)
+            self.memory.append(mem)
+
+            # replay memory
+            # TODO: probably get rid of this altogether?
+            if self.steps % self.steps_to_train_shortterm == 0:
+                self.replay_memory(np.array([mem]))
+
+            if (
+                self.steps % self.steps_to_train_longterm == 0
+                and len(self.memory) > self.minibatch_size
+                and len(self.memory) > self.min_replay_size
+            ):
+                minibatch = self.rng.choice(
+                    np.array(self.memory), size=self.minibatch_size, replace=False
+                )
+                self.replay_memory(minibatch)
+
+            # update target network weights
+            if self.steps % self.steps_per_target_update == 0:
+                self.target_nn.set_weights(self.predict_nn.get_weights())
+
+            state = next_state
+
+    def replay_memory(self, minibatch: NDArray) -> None:
         # minibatch is an array converted from: List[Tuple[State, Action, State, Reward, bool]]
         states = minibatch[:, 0]
         actions = minibatch[:, 1].astype(Action)
