@@ -260,12 +260,7 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyState, Policy]):
                 Conv2D(filters=1, kernel_size=(2, 2), padding="valid")(board)
             )
         )
-        conv2 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=1, kernel_size=(2, 2), padding="valid")(conv1)
-            )
-        )
-        flat = Flatten()(conv2)
+        flat = Flatten()(board)
         concat = Concatenate()([flat, input_curr_digit, input_next_digit])
         dense1 = Dropout(rate=self.DROPOUT_RATE)(
             Activation("relu")(BatchNormalization(axis=1)(Dense(256)(concat)))
@@ -344,20 +339,20 @@ def deep_q_3x3_trained_game():
         DigitParty(n=3),
         nn,
         DeepQParameters(
-            alpha=0.01,
-            gamma=0.618,
-            min_epsilon=0.5,
+            alpha=0.0005,
+            gamma=0.9,
+            min_epsilon=0.01,
             max_epsilon=1,
             epsilon_decay=0.01,
-            memory_size=100_000,
-            min_replay_size=1000,
-            minibatch_size=32,
-            training_episodes=10000,  # 9 * eps total steps
+            memory_size=1800,
+            min_replay_size=900,
+            minibatch_size=900,
+            training_episodes=15000,  # 9 * eps total steps
             episodes_per_model_save=100,
             episodes_per_memory_save=100,
-            steps_to_train_longterm=1000,  # (steps / 9) episodes before training longterm
+            steps_to_train_longterm=9,  # (steps / 9) episodes before training longterm
             steps_to_train_shortterm=1,
-            steps_per_target_update=1000,  # (steps / 9) episodes before updating target network
+            steps_per_target_update=900,  # (steps / 9) episodes before updating target network
         ),
         memory_folder=f"{cur_dir}/deepq_3x3_memory/",
     )
@@ -368,23 +363,16 @@ def deep_q_3x3_trained_game():
     prediction = 0
 
     def deepq_play(state: DigitPartyState) -> DigitPartyPlacement:
-        nonlocal random
-        nonlocal prediction
-        print(f"board:\n{state.board}")
-        print(f"next: {state.next}")
-        pi = nn.predict([state])
-        print(f"pi: {pi}")
+        nonlocal random, prediction
+        pi = nn.predict([state])[0]
         action_statuses = np.asarray(g.actions(state))
         valid_actions = np.where(action_statuses == VALID)[0]
-        a = np.argmax(pi * action_statuses)
+        a = valid_actions[np.argmax(pi[valid_actions])]
         if not np.isin(valid_actions, a).any():
-            # TODO: might be an issue with my model, not the implementation?
-            # policy not robust enough, so when masked with action statuses it produces no valid actions
             a = np.random.choice(valid_actions)
-            print(f"######## CHOSE RANDOM ACTION {a}")
+            print("######### CHOSE RANDOM ACTION", a)
             random += 1
         else:
-            print(f"nn chose action {a}")
             prediction += 1
 
         n = state.board.shape[0]
@@ -392,9 +380,9 @@ def deep_q_3x3_trained_game():
         c = int(a % n)
         return r, c
 
-    computer_game(g, 1000, deepq_play)
-    print("random actions: ", random)
-    print("predicted actions: ", prediction)
+    computer_game(g, 100, deepq_play)
+    print(f"random: {random}")
+    print(f"prediction: {prediction}")
 
 
 class DigitParty5x5NeuralNetwork(NeuralNetwork[DigitPartyState, Policy]):
@@ -512,6 +500,7 @@ def deep_q_5x5_trained_game():
             minibatch_size=32,
             training_episodes=3000,  # 25 * eps total steps
             episodes_per_model_save=100,
+            episodes_per_memory_save=100,
             steps_to_train_longterm=1000,  # (steps / 25) episodes before training longterm
             steps_to_train_shortterm=1,
             steps_per_target_update=1000,  # (steps / 25) episodes before updating target network
