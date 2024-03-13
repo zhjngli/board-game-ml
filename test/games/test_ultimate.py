@@ -4,7 +4,7 @@ from games.game import P1, P2
 from games.ultimate_ttt.ultimate import UltimateState, UltimateTicTacToe
 
 
-def test_tie():
+def test_unfinished():
     b = np.asarray(
         [
             [
@@ -13,14 +13,41 @@ def test_tie():
                 [[0, 0, 1], [0, 0, 1], [0, 0, 1]],
             ],
             [
-                [[-1, 0, 0], [-1, 0, 0], [-1, 0, 0]],
-                [[1, -1, 1], [1, -1, 1], [-1, 1, -1]],
-                [[0, 0, -1], [0, 0, -1], [0, 0, -1]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
             ],
             [
-                [[1, 0, 0], [1, 0, 0], [1, 0, 0]],
-                [[0, -1, 0], [0, -1, 0], [0, -1, 0]],
-                [[0, 0, 1], [0, 0, 1], [0, 0, 1]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            ],
+        ]
+    )
+    state = UltimateState(board=b, player=P1, active_nonant=None)
+    assert not UltimateTicTacToe._is_win(P1, b)
+    assert not UltimateTicTacToe._is_win(P2, b)
+    assert not UltimateTicTacToe._is_board_filled(b)
+    assert not UltimateTicTacToe.check_finished(state)
+
+
+def test_tie():
+    b = np.asarray(
+        [
+            [
+                [[1, 0, 0], [1, 0, 0], [1, 0, 0]],  # p1 win
+                [[0, -1, 0], [0, -1, 0], [0, -1, 0]],  # p2 win
+                [[0, 0, 1], [0, 0, 1], [0, 0, 1]],  # p1 win
+            ],
+            [
+                [[-1, 0, 0], [-1, 0, 0], [-1, 0, 0]],  # p2 win
+                [[1, -1, 1], [1, -1, 1], [-1, 1, -1]],  # tie
+                [[0, 0, -1], [0, 0, -1], [0, 0, -1]],  # p2 win
+            ],
+            [
+                [[1, 0, 0], [1, 0, 0], [1, 0, 0]],  # p1 win
+                [[0, -1, 0], [0, -1, 0], [0, -1, 0]],  # p2 win
+                [[0, 0, 1], [0, 0, 1], [0, 0, 1]],  # p1 win
             ],
         ]
     )

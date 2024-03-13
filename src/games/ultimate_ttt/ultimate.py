@@ -196,6 +196,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
 
     @staticmethod
     def _is_win(p: Player, board: UltimateBoard) -> bool:
+        # TODO: might be able to simplify this, but would take some refactoring
         threeinarow = UltimateTicTacToe._3_in_a_row(p, board)
         if threeinarow:
             return threeinarow
@@ -204,7 +205,10 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         if UltimateTicTacToe._3_in_a_row(opp, board):
             return False
 
-        # if no one has 3 in a row, check if p has more mini wins
+        if not UltimateTicTacToe._is_board_filled(board):
+            return False
+
+        # if no one has 3 in a row, and board is filled, check if p has more mini wins
         p_wins = 0
         opp_wins = 0
         for r in range(3):
