@@ -20,7 +20,7 @@ from keras.models import Model  # type: ignore
 from keras.optimizers.legacy import Adam  # type: ignore
 from typing_extensions import override
 
-from games.game import P1, P2, VALID
+from games.game import P1, P2, VALID, Action, State
 from games.ultimate_ttt.ultimate import (
     Location,
     Section,
@@ -34,7 +34,10 @@ from learners.alpha_zero.alpha_zero import (
     A0Parameters,
     AlphaZero,
 )
-from learners.alpha_zero.monte_carlo_tree_search import MCTSParameters
+from learners.alpha_zero.monte_carlo_tree_search import (
+    MCTSParameters,
+    MonteCarloTreeSearch,
+)
 from learners.monte_carlo import MonteCarloLearner
 from learners.trainer import Trainer
 from nn.neural_network import NeuralNetwork
@@ -313,3 +316,38 @@ def alpha_zero_trained_game():
         training_examples_folder=f"{cur_dir}/a0_training_examples/",
     )
     a0.train()
+
+    g = UltimateTicTacToe()
+    params = MCTSParameters(
+        num_searches=100,
+        cpuct=1,
+        epsilon=1e-4,
+    )
+    nn1 = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn1.load("best_model.h5")
+    nn2 = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn2.load("best_model.h5")
+    mcts1 = MonteCarloTreeSearch(g, nn1, params)
+    mcts2 = MonteCarloTreeSearch(g, nn2, params)
+
+    def play1(s: State) -> Action:
+        return int(np.argmax(mcts1.action_probabilities(s, temperature=0)))
+
+    def play2(s: State) -> Action:
+        return int(np.argmax(mcts2.action_probabilities(s, temperature=0)))
+
+    while not g.is_finished():
+        print(f"\n{g.show()}\n")
+        sec, loc = UltimateTicTacToe.from_action(play1(g.state()))
+        g.play(sec, loc)
+        print(f"computer X plays at section {sec} location {loc}")
+        if g.is_finished():
+            break
+
+        print(f"\n{g.show()}\n")
+        sec, loc = UltimateTicTacToe.from_action(play2(g.state()))
+        g.play(sec, loc)
+        print(f"computer O plays at section {sec} location {loc}")
+
+    print(g.show())
+    print("\ngame over!")
