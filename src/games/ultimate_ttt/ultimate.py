@@ -209,7 +209,6 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         opp_wins = 0
         for r in range(3):
             for c in range(3):
-                print(board[r][c])
                 if TicTacToe._is_win(p, board[r][c]):
                     p_wins += 1
                 if TicTacToe._is_win(opp, board[r][c]):
