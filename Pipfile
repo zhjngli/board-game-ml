@@ -11,6 +11,8 @@ pandas = "*"
 pandas-stubs = "*"
 tensorflow = "*"
 keras = "*"
+tqdm = "*"
+types-tqdm = "*"
 
 [dev-packages]
 mypy = "*"
