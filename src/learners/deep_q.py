@@ -17,15 +17,16 @@ class DeepQParameters(NamedTuple):
     min_epsilon: float
     max_epsilon: float
     epsilon_decay: float
+    valid_action_reward: float
     memory_size: int
     min_replay_size: int
     minibatch_size: int
-    training_episodes: int
-    episodes_per_model_save: int
-    episodes_per_memory_save: int
     steps_to_train_longterm: int
     steps_to_train_shortterm: int
     steps_per_target_update: int
+    training_episodes: int
+    episodes_per_model_save: int
+    episodes_per_memory_save: int
 
 
 Policy = NDArray  # TODO: one dimensional NDArray of arbitrary length
@@ -48,12 +49,12 @@ class DeepQLearner(Generic[State, Immutable]):
         )
         self.memory_folder = memory_folder
 
-        self.min_replay_size = params.min_replay_size
-        self.minibatch_size = params.minibatch_size
-
         self.training_episodes = params.training_episodes
         self.episodes_per_model_save = params.episodes_per_model_save
         self.episodes_per_memory_save = params.episodes_per_memory_save
+
+        self.min_replay_size = params.min_replay_size
+        self.minibatch_size = params.minibatch_size
 
         self.steps_to_train_longterm = params.steps_to_train_longterm
         self.steps_to_train_shortterm = params.steps_to_train_shortterm
@@ -64,6 +65,7 @@ class DeepQLearner(Generic[State, Immutable]):
         self.min_epsilon = params.min_epsilon
         self.max_epsilon = params.max_epsilon
         self.epsilon_decay = params.epsilon_decay
+        self.valid_action_reward = params.valid_action_reward
 
         self.rng = np.random.default_rng()
 
@@ -122,7 +124,7 @@ class DeepQLearner(Generic[State, Immutable]):
             try:
                 next_state = self.game.apply(state, a)
                 new_score = self.game.calculate_reward(next_state)
-                reward = new_score - score
+                reward = new_score - score + self.valid_action_reward
                 game_end = self.game.check_finished(next_state)
             except ValueError:
                 # punish invalid actions

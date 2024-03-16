@@ -295,6 +295,10 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyState, Policy]):
             [input.next[1] if input.next[1] is not None else 0 for input in inputs]
         )
         policies = np.asarray(outputs)
+        print("boards: ", len(input_boards), input_boards)
+        print("currs: ", len(input_currs), input_currs)
+        print("nexts: ", len(input_nexts), input_nexts)
+        print("pis: ", len(policies), policies)
         self.model.fit(
             x=[input_boards, input_currs, input_nexts],
             y=policies,
@@ -339,20 +343,21 @@ def deep_q_3x3_trained_game():
         DigitParty(n=3),
         nn,
         DeepQParameters(
-            alpha=0.0005,
+            alpha=0.001,
             gamma=0.9,
             min_epsilon=0.01,
             max_epsilon=1,
             epsilon_decay=0.01,
+            valid_action_reward=0.01,
             memory_size=1800,
             min_replay_size=900,
             minibatch_size=900,
-            training_episodes=15000,  # 9 * eps total steps
+            steps_to_train_longterm=9,
+            steps_to_train_shortterm=1,
+            steps_per_target_update=900,
+            training_episodes=500,
             episodes_per_model_save=100,
             episodes_per_memory_save=100,
-            steps_to_train_longterm=9,  # (steps / 9) episodes before training longterm
-            steps_to_train_shortterm=1,
-            steps_per_target_update=900,  # (steps / 9) episodes before updating target network
         ),
         memory_folder=f"{cur_dir}/deepq_3x3_memory/",
     )
@@ -367,7 +372,8 @@ def deep_q_3x3_trained_game():
         pi = nn.predict([state])[0]
         action_statuses = np.asarray(g.actions(state))
         valid_actions = np.where(action_statuses == VALID)[0]
-        a = valid_actions[np.argmax(pi[valid_actions])]
+        # a = valid_actions[np.argmax(pi[valid_actions])]
+        a = np.argmax(pi)
         if not np.isin(valid_actions, a).any():
             a = np.random.choice(valid_actions)
             print("######### CHOSE RANDOM ACTION", a)
@@ -495,15 +501,16 @@ def deep_q_5x5_trained_game():
             min_epsilon=0.5,
             max_epsilon=1,
             epsilon_decay=0.01,
+            valid_action_reward=0.01,
             memory_size=100_000,
             min_replay_size=1000,
             minibatch_size=32,
-            training_episodes=3000,  # 25 * eps total steps
+            steps_to_train_longterm=1000,
+            steps_to_train_shortterm=1,
+            steps_per_target_update=1000,
+            training_episodes=3000,
             episodes_per_model_save=100,
             episodes_per_memory_save=100,
-            steps_to_train_longterm=1000,  # (steps / 25) episodes before training longterm
-            steps_to_train_shortterm=1,
-            steps_per_target_update=1000,  # (steps / 25) episodes before updating target network
         ),
     )
     deepq.train()

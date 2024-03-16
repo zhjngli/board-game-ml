@@ -335,4 +335,4 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
     @staticmethod
     def calculate_reward(state: DigitPartyState) -> float:
         # scale score by theoretical max to incentivize agent to move towards theoretical max
-        return 10 * state.score / state.theoretical_max
+        return state.score / state.theoretical_max
