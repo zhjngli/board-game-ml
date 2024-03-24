@@ -103,6 +103,14 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
     def to_action(sec: Section, loc: Location) -> Action:
         (R, C) = sec
         (r, c) = loc
+        if not UltimateTicTacToe._in_range(sec):
+            raise ValueError(
+                f"Row {R} or column {C} outside of the Ultimate board, cannot convert {sec, loc} to action."
+            )
+        if not UltimateTicTacToe._in_range(loc):
+            raise ValueError(
+                f"Row {r} or column {c} outside of the section {R, C}, cannot convert {sec, loc} to action."
+            )
         sec_ix = R * 3 + C
         loc_ix = r * 3 + c
         a = sec_ix * 9 + loc_ix

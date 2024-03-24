@@ -14,10 +14,7 @@ from keras.layers import (  # type: ignore
     Reshape,
 )
 from keras.models import Model  # type: ignore
-
-# from keras.optimizers import Adam  # type: ignore
-# keras 2.11+ optimizer Adam runs slowly on M1/M2, so use legacy
-from keras.optimizers.legacy import Adam  # type: ignore
+from keras.optimizers import Adam  # type: ignore
 from typing_extensions import override
 
 from games.game import P1, P2, VALID, Action, State
@@ -43,47 +40,50 @@ from learners.trainer import Trainer
 from nn.neural_network import NeuralNetwork
 
 
+def human_play(p: int, g: UltimateTicTacToe) -> Tuple[Section, Location]:
+    t = "XO"
+    if g.active_nonant is None:
+        print(
+            "Last active section is finished, or it's a new game. You can freely choose a section to play in."
+        )
+        sec = input(f"player {p + 1} ({t[p]}) choose a section: ").strip()
+        try:
+            RC = sec.split(",")[:2]
+            R = int(RC[0])
+            C = int(RC[1])
+        except (ValueError, IndexError) as e:
+            print("can't read your section input. input as comma separated, e.g. 1,1")
+            raise e
+    else:
+        # gets past mypy error. if this happens, error will happen downstream when trying to play at (-1, -1)
+        (R, C) = g.active_nonant if g.active_nonant is not None else (-1, -1)
+        print(
+            f"The last active section is {R, C}, you are forced to play in that section."
+        )
+
+    loc = input(
+        f"player {p + 1} ({t[p]}) choose a location in section {R, C}: "
+    ).strip()
+    try:
+        rc = loc.split(",")[:2]
+        r = int(rc[0])
+        c = int(rc[1])
+    except (ValueError, IndexError) as e:
+        print("can't read your location input. input as comma separated, e.g. 1,1")
+        raise e
+
+    return ((R, C), (r, c))
+
+
 def human_game() -> None:
     g = UltimateTicTacToe()
     p = 0
-    t = "XO"
 
     while not g.is_finished():
         print(f"\n{g.show()}\n")
 
-        if g.active_nonant is None:
-            print(
-                "Last active section is finished, or it's a new game. You can freely choose a section to play in."
-            )
-            sec = input(f"player {p + 1} ({t[p]}) choose a section: ").strip()
-            try:
-                RC = sec.split(",")[:2]
-                R = int(RC[0])
-                C = int(RC[1])
-            except (ValueError, IndexError):
-                print(
-                    "can't read your section input. input as comma separated, e.g. 1,1"
-                )
-                continue
-        else:
-            # gets past mypy error. if this happens, error will happen downstream when trying to play at (-1, -1)
-            (R, C) = g.active_nonant if g.active_nonant is not None else (-1, -1)
-            print(
-                f"The last active section is {R, C}, you are forced to play in that section."
-            )
-
-        loc = input(
-            f"player {p + 1} ({t[p]}) choose a location in section {R, C}: "
-        ).strip()
         try:
-            rc = loc.split(",")[:2]
-            r = int(rc[0])
-            c = int(rc[1])
-        except (ValueError, IndexError):
-            print("can't read your location input. input as comma separated, e.g. 1,1")
-            continue
-
-        try:
+            (R, C), (r, c) = human_play(p, g)
             g.play((R, C), (r, c))
         except ValueError as e:
             print(f"\n\n{str(e)}")
@@ -253,6 +253,7 @@ class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         self.model.compile(
             loss=["categorical_crossentropy", "mean_squared_error"],
             optimizer=Adam(learning_rate=self.LEARN_RATE),
+            metrics=[["accuracy"], ["accuracy", "mse"]],
         )
         self.model.summary()
 
@@ -346,6 +347,43 @@ def alpha_zero_trained_game():
 
         print(f"\n{g.show()}\n")
         sec, loc = UltimateTicTacToe.from_action(play2(g.state()))
+        g.play(sec, loc)
+        print(f"computer O plays at section {sec} location {loc}")
+
+    print(g.show())
+    print("\ngame over!")
+
+
+def vs_alpha_zero_game():
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    params = MCTSParameters(
+        num_searches=100,
+        cpuct=1,
+        epsilon=1e-4,
+    )
+    g = UltimateTicTacToe()
+    nn = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn.load("best_model.h5")
+    mcts = MonteCarloTreeSearch(g, nn, params)
+
+    def nn_play(s: State) -> Action:
+        return int(np.argmax(mcts.action_probabilities(s, temperature=0)))
+
+    while not g.is_finished():
+        print(f"\n{g.show()}\n")
+
+        try:
+            (R, C), (r, c) = human_play(0, g)
+            g.play((R, C), (r, c))
+        except ValueError as e:
+            print(f"\n\n{str(e)}")
+            continue
+
+        if g.is_finished():
+            break
+
+        print(f"\n{g.show()}\n")
+        sec, loc = UltimateTicTacToe.from_action(nn_play(g.state()))
         g.play(sec, loc)
         print(f"computer O plays at section {sec} location {loc}")
 
