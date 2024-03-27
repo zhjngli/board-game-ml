@@ -253,7 +253,7 @@ class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         self.model.compile(
             loss=["categorical_crossentropy", "mean_squared_error"],
             optimizer=Adam(learning_rate=self.LEARN_RATE),
-            metrics=[["accuracy"], ["accuracy", "mse"]],
+            metrics={"pi": ["accuracy"], "v": ["accuracy", "mse"]},
         )
         self.model.summary()
 
