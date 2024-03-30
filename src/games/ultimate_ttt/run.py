@@ -325,9 +325,9 @@ def alpha_zero_trained_game():
         epsilon=1e-4,
     )
     nn1 = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn1.load("best_model.h5")
+    nn1.load("best_model.weights.h5")
     nn2 = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn2.load("best_model.h5")
+    nn2.load("best_model.weights.h5")
     mcts1 = MonteCarloTreeSearch(g, nn1, params)
     mcts2 = MonteCarloTreeSearch(g, nn2, params)
 
