@@ -304,10 +304,10 @@ def alpha_zero_trained_game():
             temp_threshold=11,
             pit_games=20,
             pit_threshold=0.55,
-            training_episodes=100,
+            training_episodes=200,
             training_games_per_episode=10,
-            training_queue_length=100,
-            training_hist_max_len=20,
+            training_queue_length=10000,
+            training_hist_max_len=50,
         ),
         MCTSParameters(
             num_searches=100,
