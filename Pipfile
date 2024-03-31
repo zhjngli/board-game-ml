@@ -5,12 +5,12 @@ name = "pypi"
 
 [packages]
 matplotlib = "*"
-tensorflow = "*"
 types-tensorflow = "*"
-keras = "*"
 numpy = "*"
 pandas = "*"
 pandas-stubs = "*"
+tensorflow = "*"
+keras = "*"
 
 [dev-packages]
 mypy = "*"

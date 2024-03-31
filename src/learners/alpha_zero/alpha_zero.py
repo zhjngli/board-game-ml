@@ -92,6 +92,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
     def train(self) -> None:
         last_ep = self.load_latest_model()
+        self.load_training_history()
 
         for i in range(last_ep + 1, self.training_episodes + 1):
             # self play
@@ -111,8 +112,8 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             self.save_training_history(f"training_examples_{i-1:07d}.pkl")
 
             # train model
-            self.nn.save("temp_model.h5")
-            self.pn.load("temp_model.h5")
+            self.nn.save("temp_model.weights.h5")
+            self.pn.load("temp_model.weights.h5")
 
             training_data = [
                 d for game_data in self.training_history for d in game_data
@@ -122,10 +123,10 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
             # if model is good enough, keep it
             if self.pit():
-                self.nn.save(f"ep_{i:07d}_model.h5")
-                self.nn.save("best_model.h5")
+                self.nn.save(f"ep_{i:07d}_model.weights.h5")
+                self.nn.save("best_model.weights.h5")
             else:
-                self.nn.load("temp_model.h5")
+                self.nn.load("temp_model.weights.h5")
 
     def pit(self) -> bool:
         prev_mtcs = MonteCarloTreeSearch(self.game, self.pn, self.m_params)
@@ -184,6 +185,29 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         with open(training_examples_path, "wb") as f:
             pickle.dump(self.training_history, f)
 
+    def load_training_history(self) -> None:
+        if not os.path.isdir(self.training_examples_folder):
+            return
+
+        latest = 0
+        latest_training_examples = None
+        for filename in os.listdir(self.training_examples_folder):
+            f = os.path.join(self.training_examples_folder, filename)
+            if os.path.isfile(f):
+                try:
+                    # training_examples_0001.pkl
+                    i = int(filename.split(".")[0].split("_")[-1])
+                except ValueError:
+                    # any other training example file
+                    continue
+                if i >= latest:
+                    latest = i
+                    latest_training_examples = f
+
+        if latest_training_examples:
+            with open(latest_training_examples, "rb") as file:
+                self.training_history = pickle.load(file)
+
     def load_latest_model(self) -> int:
         """
         Loads latest model and returns latest training episode if training stops for whatever reason.
@@ -197,9 +221,9 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             f = os.path.join(self.nn.model_folder, filename)
             if os.path.isfile(f):
                 try:
-                    i = int(filename.split("_")[1])  # ep_0001_model.h5
+                    i = int(filename.split("_")[1])  # ep_0001_model.weights.h5
                 except ValueError:
-                    # best_model.h5 or temp_model.h5
+                    # best_model.weights.h5 or temp_model.weights.h5
                     continue
                 if i >= latest:
                     latest = i

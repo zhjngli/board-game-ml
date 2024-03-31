@@ -103,6 +103,14 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
     def to_action(sec: Section, loc: Location) -> Action:
         (R, C) = sec
         (r, c) = loc
+        if not UltimateTicTacToe._in_range(sec):
+            raise ValueError(
+                f"Row {R} or column {C} outside of the Ultimate board, cannot convert {sec, loc} to action."
+            )
+        if not UltimateTicTacToe._in_range(loc):
+            raise ValueError(
+                f"Row {r} or column {c} outside of the section {R, C}, cannot convert {sec, loc} to action."
+            )
         sec_ix = R * 3 + C
         loc_ix = r * 3 + c
         a = sec_ix * 9 + loc_ix
@@ -177,7 +185,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         )
 
     @staticmethod
-    def _is_win(p: Player, board: UltimateBoard) -> bool:
+    def _3_in_a_row(p: Player, board: UltimateBoard) -> bool:
         # fmt: off
         return (
             # horizontal
@@ -193,6 +201,32 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
             (TicTacToe._is_win(p, board[2][0]) and TicTacToe._is_win(p, board[1][1]) and TicTacToe._is_win(p, board[0][2]))
         )
         # fmt: on
+
+    @staticmethod
+    def _is_win(p: Player, board: UltimateBoard) -> bool:
+        # TODO: might be able to simplify this, but would take some refactoring
+        threeinarow = UltimateTicTacToe._3_in_a_row(p, board)
+        if threeinarow:
+            return threeinarow
+
+        opp = switch_player(p)
+        if UltimateTicTacToe._3_in_a_row(opp, board):
+            return False
+
+        if not UltimateTicTacToe._is_board_filled(board):
+            return False
+
+        # if no one has 3 in a row, and board is filled, check if p has more mini wins
+        p_wins = 0
+        opp_wins = 0
+        for r in range(3):
+            for c in range(3):
+                if TicTacToe._is_win(p, board[r][c]):
+                    p_wins += 1
+                if TicTacToe._is_win(opp, board[r][c]):
+                    opp_wins += 1
+
+        return p_wins > opp_wins
 
     def win(self, p: Player) -> bool:
         return self._is_win(p, self.board)
