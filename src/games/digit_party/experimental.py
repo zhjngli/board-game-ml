@@ -27,14 +27,16 @@ from games.digit_party.game import (
 )
 from games.digit_party.run import computer_game
 from games.game import VALID
-from learners.deep_q import Policy
+from learners.deep_q import DQNOutput
 from nn.neural_network import NeuralNetwork
 
 
-class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, Policy]):
+class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, DQNOutput]):
+    # TODO: maybe 1 channel for each digit? means i would need to reshape the input
+    # TODO: or maybe it's 1 filter for each digit?
     NUM_CHANNELS = 1
     DROPOUT_RATE = 0.3
-    LEARN_RATE = 0.05
+    LEARN_RATE = 0.1
     BATCH_SIZE = 64
     EPOCHS = 10
 
@@ -84,22 +86,22 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, Policy]):
 
         # policy, guessing the value of each valid action at the input state
         # TODO: was softmax before
-        pi = Dense(9, activation="relu", name="pi")(dense3)
-        # TODO: add an output representing the score of the input board?
+        pi = Dense(9, activation="linear", name="pi")(dense4)
+        v = Dense(1, activation="linear", name="v")(dense4)
 
         self.model = Model(
-            inputs=[input_board, input_curr_digit, input_next_digit], outputs=[pi]
+            inputs=[input_board, input_curr_digit, input_next_digit], outputs=[pi, v]
         )
         self.model.compile(
-            loss=["mean_squared_error"],
+            loss=["mean_squared_error", "mean_squared_error"],
             optimizer=Adam(learning_rate=self.LEARN_RATE),
-            metrics=["accuracy"],
+            metrics={"pi": ["accuracy", "mse"], "v": ["accuracy", "mse"]},
         )
         self.model.summary()
 
-    def train(self, data: List[Tuple[DigitPartyIR, Policy]]) -> None:
+    def train(self, data: List[Tuple[DigitPartyIR, DQNOutput]]) -> None:
         inputs: List[DigitPartyIR]
-        outputs: List[Policy]
+        outputs: List[DQNOutput]
         inputs, outputs = list(zip(*data))
         input_boards = np.asarray([input.board for input in inputs])
         input_currs = np.asarray(
@@ -108,20 +110,22 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, Policy]):
         input_nexts = np.asarray(
             [input.next[1] if input.next[1] is not None else 0 for input in inputs]
         )
-        policies = np.asarray(outputs)
+        target_pis = np.asarray([output.policy for output in outputs])
+        target_vs = np.asarray([output.value for output in outputs])
         print("boards: ", len(input_boards), input_boards)
         print("currs: ", len(input_currs), input_currs)
         print("nexts: ", len(input_nexts), input_nexts)
-        print("pis: ", len(policies), policies)
+        print("pis: ", len(target_pis), target_pis)
+        print("vs: ", len(target_vs), target_vs)
         self.model.fit(
             x=[input_boards, input_currs, input_nexts],
-            y=policies,
+            y=[target_pis, target_vs],
             batch_size=self.BATCH_SIZE,
             epochs=self.EPOCHS,
             shuffle=True,
         )
 
-    def predict(self, inputs: List[DigitPartyIR]) -> List[Policy]:
+    def predict(self, inputs: List[DigitPartyIR]) -> List[DQNOutput]:
         input_boards = np.asarray([input.board for input in inputs])
         input_currs = np.asarray(
             [input.next[0] if input.next[0] is not None else 0 for input in inputs]
@@ -129,8 +133,10 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, Policy]):
         input_nexts = np.asarray(
             [input.next[1] if input.next[1] is not None else 0 for input in inputs]
         )
-        pis = self.model.predict([input_boards, input_currs, input_nexts], verbose=0)
-        return pis
+        pis, vs = self.model.predict(
+            [input_boards, input_currs, input_nexts], verbose=0
+        )
+        return [DQNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
     def save(self, file: str) -> None:
         if not os.path.exists(self.model_folder):
@@ -150,8 +156,10 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, Policy]):
         return self.model.get_weights()
 
 
-def deep_q_3x3_trained_game() -> None:
+def deep_q_3x3_chunk_trained_game() -> None:  # noqa: C901
     cur_dir = pathlib.Path(__file__).parent.resolve()
+
+    # code to chunk the full data from q-3x3.pkl
     # with open(f"{cur_dir}/q-3x3.pkl", "rb") as file:
     #     q_table: dict[DigitPartyIR, dict[DigitPartyPlacement, float]] = pickle.load(
     #         file
@@ -188,32 +196,66 @@ def deep_q_3x3_trained_game() -> None:
         print(f"loading {latest_model}")
         nn.load(latest_model)
 
-    for i in tqdm(range(latest + 1, 100), desc="training on each chunk"):
+    for i in tqdm(range(latest + 1, 300), desc="training on each chunk"):
         with open(f"{cur_dir}/chunked_simple_q_data/{i:04d}_chunk.pkl", "rb") as file:
             q_table: dict[DigitPartyIR, dict[DigitPartyPlacement, float]] = pickle.load(
                 file
             )
         # convert q_table to states -> policies
-        training_data: List[Tuple[DigitPartyIR, Policy]] = []
+        training_data: List[Tuple[DigitPartyIR, DQNOutput]] = []
         for state, actions in tqdm(
             q_table.items(), desc=f"converting chunk {i} to nn ins/outs"
         ):
-            policy = np.zeros(len(actions))
+            pi = np.zeros(len(actions))
             for (r, c), q in actions.items():
                 a = r * 3 + c
-                policy[a] = q
-            training_data.append((state, policy))
+                pi[a] = q
+            v = DigitParty.calc_score(state)
+            training_data.append((state, DQNOutput(policy=pi, value=v)))
 
         nn.train(training_data)
         nn.save(f"simple_q_data_incremental_{i:04d}.weights.h5")
 
-    g = DigitParty(n=3)
+    deep_play_digit_party(100, 3, nn)
+
+
+def deep_q_3x3_full_trained_game() -> None:
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    model_folder = f"{cur_dir}/experimental3x3_models/"
+    nn = DigitParty3x3NeuralNetwork(model_folder=model_folder)
+
+    # could also load full data at once instead of loading each chunk
+    training_data: List[Tuple[DigitPartyIR, DQNOutput]] = []
+    for i in tqdm(range(0, 1000), desc="loading chunks"):
+        with open(f"{cur_dir}/chunked_simple_q_data/{i:04d}_chunk.pkl", "rb") as file:
+            q_table: dict[DigitPartyIR, dict[DigitPartyPlacement, float]] = pickle.load(
+                file
+            )
+        for state, actions in tqdm(
+            q_table.items(), desc=f"converting chunk {i} to nn ins/outs"
+        ):
+            pi = np.zeros(len(actions))
+            for (r, c), q in actions.items():
+                a = r * 3 + c
+                pi[a] = q
+            v = DigitParty.calc_score(state)
+            training_data.append((state, DQNOutput(policy=pi, value=v)))
+
+    nn.train(training_data)
+    nn.save("simple_q_data.weights.h5")
+
+    deep_play_digit_party(100, 3, nn)
+
+
+def deep_play_digit_party(games: int, n: int, nn: NeuralNetwork) -> None:
+    g = DigitParty(n=n)
     random = 0
     prediction = 0
 
     def deepq_play(state: DigitPartyState) -> DigitPartyPlacement:
         nonlocal random, prediction
-        pi = nn.predict([DigitParty.to_immutable(state)])[0]
+        out = nn.predict([DigitParty.to_immutable(state)])[0]
+        pi = out.policy
         action_statuses = np.asarray(g.actions(state))
         valid_actions = np.where(action_statuses == VALID)[0]
         a = valid_actions[np.argmax(pi[valid_actions])]
@@ -230,6 +272,6 @@ def deep_q_3x3_trained_game() -> None:
         c = int(a % n)
         return r, c
 
-    computer_game(g, 100, deepq_play)
+    computer_game(g, games, deepq_play)
     print(f"random: {random}")
     print(f"prediction: {prediction}")

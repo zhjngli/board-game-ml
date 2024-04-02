@@ -7,7 +7,7 @@ from typing import Deque, Generic, NamedTuple, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from games.game import VALID, Action, Game, Immutable, State
+from games.game import Action, Game, Immutable, State
 from nn.neural_network import NeuralNetwork
 
 
@@ -30,6 +30,14 @@ class DeepQParameters(NamedTuple):
 
 
 Policy = NDArray  # TODO: one dimensional NDArray of arbitrary length
+Value = float
+
+
+class DQNOutput(NamedTuple):
+    policy: Policy
+    value: Value
+
+
 Reward = float
 
 

@@ -260,7 +260,7 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyState, Policy]):
                 Conv2D(filters=1, kernel_size=(2, 2), padding="valid")(board)
             )
         )
-        flat = Flatten()(board)
+        flat = Flatten()(conv1)
         concat = Concatenate()([flat, input_curr_digit, input_next_digit])
         dense1 = Dropout(rate=self.DROPOUT_RATE)(
             Activation("relu")(BatchNormalization(axis=1)(Dense(256)(concat)))

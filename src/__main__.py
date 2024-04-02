@@ -20,6 +20,6 @@
 
 # alpha_zero_trained_game()
 
-from games.digit_party.experimental import deep_q_3x3_trained_game
+from games.digit_party.experimental import deep_q_3x3_full_trained_game
 
-deep_q_3x3_trained_game()
+deep_q_3x3_full_trained_game()
