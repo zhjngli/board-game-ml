@@ -1,6 +1,6 @@
 import os
 import pathlib
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import numpy as np
 from keras.layers import (  # type: ignore
@@ -17,8 +17,14 @@ from keras.models import Model  # type: ignore
 from keras.optimizers import Adam  # type: ignore
 from typing_extensions import override
 
-from games.game import P1, P2, Action, State
-from games.tictactoe.tictactoe import Empty, TicTacToe, TicTacToeIR
+from games.game import P1, P2
+from games.tictactoe.tictactoe import (
+    Empty,
+    TicTacToe,
+    TicTacToeIR,
+    TicTacToeState,
+    tile_char,
+)
 from learners.alpha_zero.alpha_zero import A0Parameters, AlphaZero
 from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
@@ -182,11 +188,19 @@ class TicTacToeQLearner(SimpleQLearner[TicTacToeIR, Tuple[int, int]]):
         ]
 
 
-def _computer_play(g: TicTacToe, p: TicTacToeMonteCarloLearner | TicTacToeQLearner):
-    print(f"\n{g.show()}\n")
-    r, c = p.choose_action(g.to_immutable(g.state()), exploit=True)
+def _computer_play(
+    g: TicTacToe, computer: Callable[[TicTacToeState], Tuple[int, int]], verbose=True
+):
+    if verbose:
+        print(f"\n{g.show()}\n")
+
+    s = g.state()
+    p = tile_char(s.player)
+    r, c = computer(s)
     g.play(r, c)
-    print(f"\ncomputer plays at ({r}, {c})!")
+
+    if verbose:
+        print(f"\ncomputer {p} plays at {r, c}!")
 
 
 def _human_play(g: TicTacToe):
@@ -208,8 +222,8 @@ def _human_play(g: TicTacToe):
 
 def _trained_game(  # noqa: C901
     g: TicTacToe,
-    computer1: TicTacToeMonteCarloLearner | TicTacToeQLearner,
-    computer2: TicTacToeMonteCarloLearner | TicTacToeQLearner,
+    computer1: Callable[[TicTacToeState], Tuple[int, int]],
+    computer2: Callable[[TicTacToeState], Tuple[int, int]],
 ):
     player = input(
         "play as player 1 or 2? or choose 0 to spectate computers play. "
@@ -255,8 +269,8 @@ def _trained_game(  # noqa: C901
 
 def _many_games(
     g: TicTacToe,
-    computer1: TicTacToeMonteCarloLearner | TicTacToeQLearner,
-    computer2: TicTacToeMonteCarloLearner | TicTacToeQLearner,
+    computer1: Callable[[TicTacToeState], Tuple[int, int]],
+    computer2: Callable[[TicTacToeState], Tuple[int, int]],
     games: int,
 ):
     x_wins = 0
@@ -264,12 +278,10 @@ def _many_games(
     ties = 0
     for _ in range(games):
         while not g.is_finished():
-            r, c = computer1.choose_action(g.to_immutable(g.state()), exploit=True)
-            g.play(r, c)
+            _computer_play(g, computer1, verbose=False)
             if g.is_finished():
                 break
-            r, c = computer2.choose_action(g.to_immutable(g.state()), exploit=True)
-            g.play(r, c)
+            _computer_play(g, computer2, verbose=False)
 
         if g.win(P1):
             x_wins += 1
@@ -295,7 +307,13 @@ def monte_carlo_trained_game(training_episodes=0):
     g = TicTacToeMonteCarloTrainer(p1=computer1, p2=computer2)
     g.train(episodes=training_episodes)
 
-    _trained_game(g, computer1, computer2)
+    def play1(s: TicTacToeState) -> Tuple[int, int]:
+        return computer1.choose_action(g.to_immutable(s), exploit=True)
+
+    def play2(s: TicTacToeState) -> Tuple[int, int]:
+        return computer2.choose_action(g.to_immutable(s), exploit=True)
+
+    _trained_game(g, play1, play2)
 
 
 def monte_carlo_many_games(games=10000):
@@ -303,7 +321,13 @@ def monte_carlo_many_games(games=10000):
     computer2 = TicTacToeMonteCarloLearner(policy_file=MCP2_POLICY)
     g = TicTacToeMonteCarloTrainer(p1=computer1, p2=computer2)
 
-    _many_games(g, computer1, computer2, games)
+    def play1(s: TicTacToeState) -> Tuple[int, int]:
+        return computer1.choose_action(g.to_immutable(s), exploit=True)
+
+    def play2(s: TicTacToeState) -> Tuple[int, int]:
+        return computer2.choose_action(g.to_immutable(s), exploit=True)
+
+    _many_games(g, play1, play2, games)
 
 
 QP1_POLICY = "src/games/tictactoe/qp1.pkl"
@@ -316,7 +340,13 @@ def q_trained_game(training_episodes=0):
     g = TicTacToeQTrainer(p1=computer1, p2=computer2)
     g.train(episodes=training_episodes)
 
-    _trained_game(g, computer1, computer2)
+    def play1(s: TicTacToeState) -> Tuple[int, int]:
+        return computer1.choose_action(g.to_immutable(s), exploit=True)
+
+    def play2(s: TicTacToeState) -> Tuple[int, int]:
+        return computer2.choose_action(g.to_immutable(s), exploit=True)
+
+    _trained_game(g, play1, play2)
 
 
 def q_many_games(games=10000):
@@ -324,7 +354,13 @@ def q_many_games(games=10000):
     computer2 = TicTacToeQLearner(q_pickle=QP2_POLICY)
     g = TicTacToeQTrainer(p1=computer1, p2=computer2)
 
-    _many_games(g, computer1, computer2, games)
+    def play1(s: TicTacToeState) -> Tuple[int, int]:
+        return computer1.choose_action(g.to_immutable(s), exploit=True)
+
+    def play2(s: TicTacToeState) -> Tuple[int, int]:
+        return computer2.choose_action(g.to_immutable(s), exploit=True)
+
+    _many_games(g, play1, play2, games)
 
 
 class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
@@ -343,22 +379,32 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
         board = Reshape((3, 3, self.NUM_CHANNELS))(input)
         # normalize along channels axis
-        conv = Activation("relu")(
+        conv1 = Activation("relu")(
             BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(3, 3), padding="valid")(
+                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(2, 2), padding="same")(
                     board
                 )
             )
         )
-        flat = Flatten()(conv)
-        dense = Dropout(rate=self.DROPOUT_RATE)(
+        conv2 = Activation("relu")(
+            BatchNormalization(axis=3)(
+                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(2, 2), padding="valid")(
+                    conv1
+                )
+            )
+        )
+        flat = Flatten()(conv2)
+        dense1 = Dropout(rate=self.DROPOUT_RATE)(
             Activation("relu")(BatchNormalization(axis=1)(Dense(256)(flat)))
+        )
+        dense2 = Dropout(rate=self.DROPOUT_RATE)(
+            Activation("relu")(BatchNormalization(axis=1)(Dense(128)(dense1)))
         )
 
         # policy, guessing the value of each valid action at the input state
-        pi = Dense(TicTacToe.num_actions(), activation="softmax", name="pi")(dense)
+        pi = Dense(TicTacToe.num_actions(), activation="softmax", name="pi")(dense2)
         # value, guessing the value of the input state
-        v = Dense(1, activation="tanh", name="v")(dense)
+        v = Dense(1, activation="tanh", name="v")(dense2)
 
         self.model = Model(inputs=input, outputs=[pi, v])
         self.model.compile(
@@ -414,7 +460,7 @@ def alpha_zero_trained_game():
         A0Parameters(
             temp_threshold=1,
             pit_games=20,
-            pit_threshold=0.55,
+            pit_threshold=0.501,
             training_episodes=100,
             training_games_per_episode=10,
             training_queue_length=100,
@@ -442,24 +488,21 @@ def alpha_zero_trained_game():
     mcts1 = MonteCarloTreeSearch(g, nn1, params)
     mcts2 = MonteCarloTreeSearch(g, nn2, params)
 
-    def play1(s: State) -> Action:
-        return int(np.argmax(mcts1.action_probabilities(s, temperature=0)))
+    def play1(s: TicTacToeState) -> Tuple[int, int]:
+        return TicTacToe.from_action(
+            int(np.argmax(mcts1.action_probabilities(s, temperature=0)))
+        )
 
-    def play2(s: State) -> Action:
-        return int(np.argmax(mcts2.action_probabilities(s, temperature=0)))
+    def play2(s: TicTacToeState) -> Tuple[int, int]:
+        return TicTacToe.from_action(
+            int(np.argmax(mcts2.action_probabilities(s, temperature=0)))
+        )
 
     while not g.is_finished():
-        print(f"\n{g.show()}\n")
-        r, c = TicTacToe.from_action(play1(g.state()))
-        g.play(r, c)
-        print(f"computer X plays at {r, c}")
+        _computer_play(g, play1)
         if g.is_finished():
             break
-
-        print(f"\n{g.show()}\n")
-        r, c = TicTacToe.from_action(play2(g.state()))
-        g.play(r, c)
-        print(f"computer O plays at {r, c}")
+        _computer_play(g, play2)
 
     print(g.show())
     print("\ngame over!")
