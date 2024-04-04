@@ -95,16 +95,20 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
         )
 
     @staticmethod
-    def apply(state: TicTacToeState, a: Action) -> TicTacToeState:
+    def from_action(a: Action) -> Tuple[int, int]:
         r = int(a / 3)
         c = int(a % 3)
+        return (r, c)
+
+    @staticmethod
+    def apply(state: TicTacToeState, a: Action) -> TicTacToeState:
+        r, c = TicTacToe.from_action(a)
         if state.board[r][c] != Empty:
             raise ValueError(
                 f"Board already contains tile {state.board[r][c]} at row {r} column {c}"
             )
 
-        # TODO: does this need a copy?
-        board = state.board
+        board = np.copy(state.board)
         board[r][c] = state.player
         return TicTacToeState(
             board=board,
@@ -191,13 +195,15 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
     @staticmethod
     def symmetries_of(a: NDArray) -> List[NDArray]:
         syms: List[NDArray] = []
+        input_shape = a.shape
         b = np.copy(a)
+        b = b.reshape((3, 3))
         for i in range(1, 5):
             for mirror in [True, False]:
                 s = np.rot90(b, i)
                 if mirror:
                     s = np.fliplr(s)
-                syms += s
+                syms.append(s.reshape(input_shape))
         return syms
 
     @staticmethod
@@ -217,7 +223,7 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
         elif TicTacToe._is_win(P2, state.board):
             return P2WIN
         elif TicTacToe._is_board_filled(state.board):
-            return 0  # TODO: different value for draws?
+            return 0.1  # TODO: different value for draws?
         else:
             raise RuntimeError(f"Calling reward function when game not ended: {state}")
 

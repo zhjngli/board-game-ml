@@ -1,12 +1,34 @@
+import os
+import pathlib
 from typing import List, Tuple
 
+import numpy as np
+from keras.layers import (  # type: ignore
+    Activation,
+    BatchNormalization,
+    Conv2D,
+    Dense,
+    Dropout,
+    Flatten,
+    Input,
+    Reshape,
+)
+from keras.models import Model  # type: ignore
+from keras.optimizers import Adam  # type: ignore
 from typing_extensions import override
 
-from games.game import P1, P2
+from games.game import P1, P2, Action, State
 from games.tictactoe.tictactoe import Empty, TicTacToe, TicTacToeIR
+from learners.alpha_zero.alpha_zero import A0Parameters, AlphaZero
+from learners.alpha_zero.monte_carlo_tree_search import (
+    MCTSParameters,
+    MonteCarloTreeSearch,
+)
+from learners.alpha_zero.types import A0NNInput, A0NNOutput
 from learners.monte_carlo import MonteCarloLearner
 from learners.q import SimpleQLearner
 from learners.trainer import Trainer
+from nn.neural_network import NeuralNetwork
 
 
 def human_game() -> None:
@@ -303,3 +325,141 @@ def q_many_games(games=10000):
     g = TicTacToeQTrainer(p1=computer1, p2=computer2)
 
     _many_games(g, computer1, computer2, games)
+
+
+class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
+    NUM_CHANNELS = 1
+    DROPOUT_RATE = 0.3
+    LEARN_RATE = 0.01
+    BATCH_SIZE = 64
+    EPOCHS = 10
+
+    def __init__(self, model_folder: str) -> None:
+        super().__init__(model_folder)
+
+        input = Input(
+            shape=(3, 3), name="ttt_board"
+        )  # TODO: batch size? defaults to None I think.
+        # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
+        board = Reshape((3, 3, self.NUM_CHANNELS))(input)
+        # normalize along channels axis
+        conv = Activation("relu")(
+            BatchNormalization(axis=3)(
+                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(3, 3), padding="valid")(
+                    board
+                )
+            )
+        )
+        flat = Flatten()(conv)
+        dense = Dropout(rate=self.DROPOUT_RATE)(
+            Activation("relu")(BatchNormalization(axis=1)(Dense(256)(flat)))
+        )
+
+        # policy, guessing the value of each valid action at the input state
+        pi = Dense(TicTacToe.num_actions(), activation="softmax", name="pi")(dense)
+        # value, guessing the value of the input state
+        v = Dense(1, activation="tanh", name="v")(dense)
+
+        self.model = Model(inputs=input, outputs=[pi, v])
+        self.model.compile(
+            loss=["categorical_crossentropy", "mean_squared_error"],
+            optimizer=Adam(learning_rate=self.LEARN_RATE),
+            metrics={"pi": ["accuracy"], "v": ["accuracy", "mse"]},
+        )
+        self.model.summary()
+
+    def train(self, data: List[Tuple[A0NNInput, A0NNOutput]]) -> None:
+        inputs: List[A0NNInput]
+        outputs: List[A0NNOutput]
+        inputs, outputs = list(zip(*data))
+        input_boards = np.asarray([input.board for input in inputs])
+        target_pis = np.asarray([output.policy for output in outputs])
+        target_vs = np.asarray([output.value for output in outputs])
+        self.model.fit(
+            x=input_boards,
+            y=[target_pis, target_vs],
+            batch_size=self.BATCH_SIZE,
+            epochs=self.EPOCHS,
+            shuffle=True,
+        )
+
+    def predict(self, inputs: List[A0NNInput]) -> List[A0NNOutput]:
+        boards = np.asarray([i.board for i in inputs])
+        pis, vs = self.model.predict(boards, verbose=0)
+        return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
+
+    def save(self, file: str) -> None:
+        if not os.path.exists(self.model_folder):
+            print(f"Making directory for models at: {self.model_folder}")
+            os.makedirs(self.model_folder)
+        model_path = os.path.join(self.model_folder, file)
+        self.model.save_weights(model_path)
+
+    def load(self, file: str) -> None:
+        model_path = os.path.join(self.model_folder, file)
+        self.model.load_weights(model_path)
+
+    def set_weights(self, weights) -> None:
+        self.model.set_weights(weights)
+
+    def get_weights(self):
+        return self.model.get_weights()
+
+
+def alpha_zero_trained_game():
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    a0 = AlphaZero(
+        TicTacToe(),
+        TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
+        A0Parameters(
+            temp_threshold=1,
+            pit_games=20,
+            pit_threshold=0.55,
+            training_episodes=100,
+            training_games_per_episode=10,
+            training_queue_length=100,
+            training_hist_max_len=20,
+        ),
+        MCTSParameters(
+            num_searches=100,
+            cpuct=1,
+            epsilon=1e-4,
+        ),
+        training_examples_folder=f"{cur_dir}/a0_training_examples/",
+    )
+    a0.train()
+
+    g = TicTacToe()
+    params = MCTSParameters(
+        num_searches=100,
+        cpuct=1,
+        epsilon=1e-4,
+    )
+    nn1 = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn1.load("best_model.weights.h5")
+    nn2 = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn2.load("best_model.weights.h5")
+    mcts1 = MonteCarloTreeSearch(g, nn1, params)
+    mcts2 = MonteCarloTreeSearch(g, nn2, params)
+
+    def play1(s: State) -> Action:
+        return int(np.argmax(mcts1.action_probabilities(s, temperature=0)))
+
+    def play2(s: State) -> Action:
+        return int(np.argmax(mcts2.action_probabilities(s, temperature=0)))
+
+    while not g.is_finished():
+        print(f"\n{g.show()}\n")
+        r, c = TicTacToe.from_action(play1(g.state()))
+        g.play(r, c)
+        print(f"computer X plays at {r, c}")
+        if g.is_finished():
+            break
+
+        print(f"\n{g.show()}\n")
+        r, c = TicTacToe.from_action(play2(g.state()))
+        g.play(r, c)
+        print(f"computer O plays at {r, c}")
+
+    print(g.show())
+    print("\ngame over!")
