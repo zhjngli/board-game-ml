@@ -369,13 +369,12 @@ def q_many_games(games=10000):
 
 
 class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
-    NUM_FILTERS = 1
+    NUM_FILTERS = 3  # TODO: change? currently it's 1 filter per possible value in the input board: -1, 0, 1
     DROPOUT_RATE = 0.3
     LEARN_RATE = 0.01
     BATCH_SIZE = 64
     EPOCHS = 10
 
-    # TODO: more layers to the network?
     def __init__(self, model_folder: str) -> None:
         super().__init__(model_folder)
 
@@ -484,7 +483,7 @@ def alpha_zero_trained_game():
             temp_threshold=1,
             pit_games=100,
             pit_threshold=0.55,
-            training_episodes=150,
+            training_episodes=100,
             training_games_per_episode=100,
             training_queue_length=10000,
             training_hist_max_len=20,
