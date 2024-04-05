@@ -375,12 +375,11 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
     BATCH_SIZE = 64
     EPOCHS = 10
 
+    # TODO: more layers to the network?
     def __init__(self, model_folder: str) -> None:
         super().__init__(model_folder)
 
-        input = Input(
-            shape=(3, 3), name="ttt_board"
-        )  # TODO: batch size? defaults to None I think.
+        input = Input(shape=(3, 3), name="ttt_board")
         # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
         board = Reshape((3, 3, self.NUM_CHANNELS))(input)
         # normalize along channels axis
