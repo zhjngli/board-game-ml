@@ -1,6 +1,6 @@
 import os
 import pathlib
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 from keras.layers import (  # type: ignore
@@ -273,16 +273,20 @@ def _many_games(
     computer1: Callable[[TicTacToeState], Tuple[int, int]],
     computer2: Callable[[TicTacToeState], Tuple[int, int]],
     games: int,
+    desc: Optional[str] = None,
+    verbose: bool = False,
 ):
     x_wins = 0
     o_wins = 0
     ties = 0
-    for _ in tqdm(range(games), desc="playing computer games"):
+    if desc is None:
+        desc = f"playing {games} computer games"
+    for _ in tqdm(range(games), desc=desc):
         while not g.is_finished():
-            _computer_play(g, computer1, verbose=False)
+            _computer_play(g, computer1, verbose=verbose)
             if g.is_finished():
                 break
-            _computer_play(g, computer2, verbose=False)
+            _computer_play(g, computer2, verbose=verbose)
 
         if g.win(P1):
             x_wins += 1
@@ -309,10 +313,10 @@ def monte_carlo_trained_game(training_episodes=0):
     g.train(episodes=training_episodes)
 
     def play1(s: TicTacToeState) -> Tuple[int, int]:
-        return computer1.choose_action(g.to_immutable(s), exploit=True)
+        return computer1.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
     def play2(s: TicTacToeState) -> Tuple[int, int]:
-        return computer2.choose_action(g.to_immutable(s), exploit=True)
+        return computer2.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
     _trained_game(g, play1, play2)
 
@@ -323,12 +327,12 @@ def monte_carlo_many_games(games=10000):
     g = TicTacToeMonteCarloTrainer(p1=computer1, p2=computer2)
 
     def play1(s: TicTacToeState) -> Tuple[int, int]:
-        return computer1.choose_action(g.to_immutable(s), exploit=True)
+        return computer1.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
     def play2(s: TicTacToeState) -> Tuple[int, int]:
-        return computer2.choose_action(g.to_immutable(s), exploit=True)
+        return computer2.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
-    _many_games(g, play1, play2, games)
+    _many_games(g, play1, play2, games, desc="monte carlo versus games")
 
 
 QP1_POLICY = "src/games/tictactoe/qp1.pkl"
@@ -342,10 +346,10 @@ def q_trained_game(training_episodes=0):
     g.train(episodes=training_episodes)
 
     def play1(s: TicTacToeState) -> Tuple[int, int]:
-        return computer1.choose_action(g.to_immutable(s), exploit=True)
+        return computer1.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
     def play2(s: TicTacToeState) -> Tuple[int, int]:
-        return computer2.choose_action(g.to_immutable(s), exploit=True)
+        return computer2.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
     _trained_game(g, play1, play2)
 
@@ -356,12 +360,12 @@ def q_many_games(games=10000):
     g = TicTacToeQTrainer(p1=computer1, p2=computer2)
 
     def play1(s: TicTacToeState) -> Tuple[int, int]:
-        return computer1.choose_action(g.to_immutable(s), exploit=True)
+        return computer1.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
     def play2(s: TicTacToeState) -> Tuple[int, int]:
-        return computer2.choose_action(g.to_immutable(s), exploit=True)
+        return computer2.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
-    _many_games(g, play1, play2, games)
+    _many_games(g, play1, play2, games, desc="simple q versus games")
 
 
 class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
@@ -478,28 +482,20 @@ def alpha_zero_trained_game():
     a0.train()
 
     g = TicTacToe()
-    nn1 = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn1.load("best_model.weights.h5")
-    nn2 = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn2.load("best_model.weights.h5")
-    mcts1 = MonteCarloTreeSearch(g, nn1, mcts_params)
-    mcts2 = MonteCarloTreeSearch(g, nn2, mcts_params)
+    nn = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn.load("best_model.weights.h5")
+    mcts = MonteCarloTreeSearch(g, nn, mcts_params)
 
-    def play1(s: TicTacToeState) -> Tuple[int, int]:
+    def play(s: TicTacToeState) -> Tuple[int, int]:
         return TicTacToe.from_action(
-            int(np.argmax(mcts1.action_probabilities(s, temperature=0)))
-        )
-
-    def play2(s: TicTacToeState) -> Tuple[int, int]:
-        return TicTacToe.from_action(
-            int(np.argmax(mcts2.action_probabilities(s, temperature=0)))
+            int(np.argmax(mcts.action_probabilities(s, temperature=0)))
         )
 
     while not g.is_finished():
-        _computer_play(g, play1)
+        _computer_play(g, play)
         if g.is_finished():
             break
-        _computer_play(g, play2)
+        _computer_play(g, play)
 
     print(g.show())
     print("\ngame over!")
@@ -546,13 +542,23 @@ def a0_vs_mc_games(games=1000):
     computer2 = TicTacToeMonteCarloLearner(policy_file=MCP2_POLICY)
 
     def mc_play1(s: TicTacToeState) -> Tuple[int, int]:
-        return computer1.choose_action(g.to_immutable(s), exploit=True)
+        return computer1.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
     def mc_play2(s: TicTacToeState) -> Tuple[int, int]:
-        return computer2.choose_action(g.to_immutable(s), exploit=True)
+        return computer2.choose_action(TicTacToe.to_immutable(s), exploit=True)
 
-    print("alpha zero as P1 playing monte carlo as P2")
-    _many_games(g, a0_play, mc_play2, int(games / 2))
-
-    print("monte carlo as P1 playing alpha zero as P2")
-    _many_games(g, mc_play1, a0_play, int(games / 2))
+    half = int(games / 2)
+    _many_games(
+        g,
+        a0_play,
+        mc_play2,
+        half,
+        desc=f"P1: alpha zero. P2: monte carlo. games: {half}",
+    )
+    _many_games(
+        g,
+        mc_play1,
+        a0_play,
+        half,
+        desc=f"P1: monte carlo. P2: alpha zero. games: {half}",
+    )

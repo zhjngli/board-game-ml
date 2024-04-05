@@ -20,11 +20,13 @@ from games.tictactoe.run import (
     a0_vs_mc_games,
     alpha_zero_many_games,
     alpha_zero_trained_game,
+    monte_carlo_many_games,
 )
 
 alpha_zero_trained_game()
 alpha_zero_many_games()
 a0_vs_mc_games()
+monte_carlo_many_games()
 
 # from games.ultimate_ttt.run import alpha_zero_trained_game
 
