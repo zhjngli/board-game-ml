@@ -74,6 +74,9 @@ class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
         super().__init__()
         self.p1 = p1
         self.p2 = p2
+        self.p1_wins = 0
+        self.p2_wins = 0
+        self.draws = 0
 
     @override
     def train(self, episodes=1000) -> None:
@@ -81,19 +84,22 @@ class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
 
         self.p1.save_policy()
         self.p2.save_policy()
+        print(f"X won {self.p1_wins} times")
+        print(f"O won {self.p2_wins} times")
+        print(f"{self.draws} draws")
 
     def train_once(self) -> None:
         while not self.is_finished():
-            r, c = self.p1.choose_action(self.to_immutable(self.state()))
+            r, c = self.p1.choose_action(TicTacToe.to_immutable(self.state()))
             self.play1(r, c)
-            self.p1.add_state(self.to_immutable(self.state()))
+            self.add_state(self.state())
 
             if self.is_finished():
                 break
 
-            r, c = self.p2.choose_action(self.to_immutable(self.state()))
+            r, c = self.p2.choose_action(TicTacToe.to_immutable(self.state()))
             self.play2(r, c)
-            self.p2.add_state(self.to_immutable(self.state()))
+            self.add_state(self.state())
 
             if self.is_finished():
                 break
@@ -103,17 +109,25 @@ class TicTacToeMonteCarloTrainer(TicTacToe, Trainer):
         self.p1.reset_states()
         self.p2.reset_states()
 
+    def add_state(self, s: TicTacToeState) -> None:
+        ir = TicTacToe.to_immutable(s)
+        self.p1.add_state(ir)
+        self.p2.add_state(ir)
+
     def give_rewards(self) -> None:
         # TODO: how might changing these rewards affect behavior?
         if self.win(P1):
             self.p1.propagate_reward(1)
             self.p2.propagate_reward(0)
+            self.p1_wins += 1
         elif self.win(P2):
             self.p1.propagate_reward(0)
             self.p2.propagate_reward(1)
+            self.p2_wins += 1
         elif self.board_filled():
             self.p1.propagate_reward(0.1)
             self.p2.propagate_reward(0.5)
+            self.draws += 1
         else:
             raise RuntimeError(
                 "giving rewards when game's not over. something's wrong!"
