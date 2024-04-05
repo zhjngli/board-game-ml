@@ -456,7 +456,7 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
 def alpha_zero_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     mcts_params = MCTSParameters(
-        num_searches=2000,
+        num_searches=100,
         cpuct=1,
         epsilon=1e-4,
     )
@@ -469,7 +469,7 @@ def alpha_zero_trained_game():
             pit_threshold=0.55,
             training_episodes=150,
             training_games_per_episode=100,
-            training_queue_length=100,
+            training_queue_length=10000,
             training_hist_max_len=20,
         ),
         mcts_params,
@@ -509,25 +509,50 @@ def alpha_zero_many_games(games=1000):
     cur_dir = pathlib.Path(__file__).parent.resolve()
     g = TicTacToe()
     params = MCTSParameters(
-        num_searches=2000,
+        num_searches=100,
         cpuct=1,
         epsilon=1e-4,
     )
-    nn1 = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn1.load("best_model.weights.h5")
-    nn2 = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn2.load("best_model.weights.h5")
-    mcts1 = MonteCarloTreeSearch(g, nn1, params)
-    mcts2 = MonteCarloTreeSearch(g, nn2, params)
+    nn = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn.load("best_model.weights.h5")
+    mcts = MonteCarloTreeSearch(g, nn, params)
 
-    def play1(s: TicTacToeState) -> Tuple[int, int]:
+    def play(s: TicTacToeState) -> Tuple[int, int]:
         return TicTacToe.from_action(
-            int(np.argmax(mcts1.action_probabilities(s, temperature=0)))
+            int(np.argmax(mcts.action_probabilities(s, temperature=0)))
         )
 
-    def play2(s: TicTacToeState) -> Tuple[int, int]:
+    _many_games(g, play, play, games)
+
+
+def a0_vs_mc_games(games=1000):
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    g = TicTacToe()
+    params = MCTSParameters(
+        num_searches=100,
+        cpuct=1,
+        epsilon=1e-4,
+    )
+    nn = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn.load("best_model.weights.h5")
+    mcts = MonteCarloTreeSearch(g, nn, params)
+
+    def a0_play(s: TicTacToeState) -> Tuple[int, int]:
         return TicTacToe.from_action(
-            int(np.argmax(mcts2.action_probabilities(s, temperature=0)))
+            int(np.argmax(mcts.action_probabilities(s, temperature=0)))
         )
 
-    _many_games(g, play1, play2, games)
+    computer1 = TicTacToeMonteCarloLearner(policy_file=MCP1_POLICY)
+    computer2 = TicTacToeMonteCarloLearner(policy_file=MCP2_POLICY)
+
+    def mc_play1(s: TicTacToeState) -> Tuple[int, int]:
+        return computer1.choose_action(g.to_immutable(s), exploit=True)
+
+    def mc_play2(s: TicTacToeState) -> Tuple[int, int]:
+        return computer2.choose_action(g.to_immutable(s), exploit=True)
+
+    print("alpha zero as P1 playing monte carlo as P2")
+    _many_games(g, a0_play, mc_play2, int(games / 2))
+
+    print("monte carlo as P1 playing alpha zero as P2")
+    _many_games(g, mc_play1, a0_play, int(games / 2))
