@@ -16,9 +16,10 @@
 # ttt_mc_trained_game(training_episodes=1)
 # ttt_mc_many_games()
 
-from games.tictactoe.run import alpha_zero_trained_game
+from games.tictactoe.run import alpha_zero_many_games, alpha_zero_trained_game
 
 alpha_zero_trained_game()
+alpha_zero_many_games()
 
 # from games.ultimate_ttt.run import alpha_zero_trained_game
 

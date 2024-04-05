@@ -15,6 +15,7 @@ from keras.layers import (  # type: ignore
 )
 from keras.models import Model  # type: ignore
 from keras.optimizers import Adam  # type: ignore
+from tqdm import tqdm
 from typing_extensions import override
 
 from games.game import P1, P2
@@ -276,7 +277,7 @@ def _many_games(
     x_wins = 0
     o_wins = 0
     ties = 0
-    for _ in range(games):
+    for _ in tqdm(range(games), desc="playing computer games"):
         while not g.is_finished():
             _computer_play(g, computer1, verbose=False)
             if g.is_finished():
@@ -454,30 +455,61 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
 
 def alpha_zero_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
+    mcts_params = MCTSParameters(
+        num_searches=2000,
+        cpuct=1,
+        epsilon=1e-4,
+    )
     a0 = AlphaZero(
         TicTacToe(),
         TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
         A0Parameters(
             temp_threshold=1,
-            pit_games=20,
-            pit_threshold=0.501,
-            training_episodes=100,
-            training_games_per_episode=10,
+            pit_games=100,
+            pit_threshold=0.55,
+            training_episodes=150,
+            training_games_per_episode=100,
             training_queue_length=100,
             training_hist_max_len=20,
         ),
-        MCTSParameters(
-            num_searches=100,
-            cpuct=1,
-            epsilon=1e-4,
-        ),
+        mcts_params,
         training_examples_folder=f"{cur_dir}/a0_training_examples/",
     )
     a0.train()
 
     g = TicTacToe()
+    nn1 = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn1.load("best_model.weights.h5")
+    nn2 = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn2.load("best_model.weights.h5")
+    mcts1 = MonteCarloTreeSearch(g, nn1, mcts_params)
+    mcts2 = MonteCarloTreeSearch(g, nn2, mcts_params)
+
+    def play1(s: TicTacToeState) -> Tuple[int, int]:
+        return TicTacToe.from_action(
+            int(np.argmax(mcts1.action_probabilities(s, temperature=0)))
+        )
+
+    def play2(s: TicTacToeState) -> Tuple[int, int]:
+        return TicTacToe.from_action(
+            int(np.argmax(mcts2.action_probabilities(s, temperature=0)))
+        )
+
+    while not g.is_finished():
+        _computer_play(g, play1)
+        if g.is_finished():
+            break
+        _computer_play(g, play2)
+
+    print(g.show())
+    print("\ngame over!")
+
+
+def alpha_zero_many_games(games=1000):
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    g = TicTacToe()
     params = MCTSParameters(
-        num_searches=100,
+        num_searches=2000,
         cpuct=1,
         epsilon=1e-4,
     )
@@ -498,11 +530,4 @@ def alpha_zero_trained_game():
             int(np.argmax(mcts2.action_probabilities(s, temperature=0)))
         )
 
-    while not g.is_finished():
-        _computer_play(g, play1)
-        if g.is_finished():
-            break
-        _computer_play(g, play2)
-
-    print(g.show())
-    print("\ngame over!")
+    _many_games(g, play1, play2, games)
