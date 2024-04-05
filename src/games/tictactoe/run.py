@@ -490,14 +490,7 @@ def alpha_zero_trained_game():
             int(np.argmax(mcts.action_probabilities(s, temperature=0)))
         )
 
-    while not g.is_finished():
-        _computer_play(g, play)
-        if g.is_finished():
-            break
-        _computer_play(g, play)
-
-    print(g.show())
-    print("\ngame over!")
+    _trained_game(g, play, play)
 
 
 def alpha_zero_many_games(games=1000):
