@@ -369,7 +369,7 @@ def q_many_games(games=10000):
 
 
 class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
-    NUM_CHANNELS = 1
+    NUM_FILTERS = 1
     DROPOUT_RATE = 0.3
     LEARN_RATE = 0.01
     BATCH_SIZE = 64
@@ -381,28 +381,42 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
 
         input = Input(shape=(3, 3), name="ttt_board")
         # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
-        board = Reshape((3, 3, self.NUM_CHANNELS))(input)
+        board = Reshape((3, 3, 1))(input)
         # normalize along channels axis
         conv1 = Activation("relu")(
             BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(2, 2), padding="same")(
+                Conv2D(filters=self.NUM_FILTERS, kernel_size=(2, 2), padding="same")(
                     board
                 )
             )
         )
         conv2 = Activation("relu")(
             BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_CHANNELS, kernel_size=(2, 2), padding="valid")(
+                Conv2D(filters=self.NUM_FILTERS, kernel_size=(2, 2), padding="same")(
                     conv1
                 )
             )
         )
-        flat = Flatten()(conv2)
+        conv3 = Activation("relu")(
+            BatchNormalization(axis=3)(
+                Conv2D(filters=self.NUM_FILTERS, kernel_size=(2, 2), padding="same")(
+                    conv2
+                )
+            )
+        )
+        conv4 = Activation("relu")(
+            BatchNormalization(axis=3)(
+                Conv2D(filters=self.NUM_FILTERS, kernel_size=(2, 2), padding="valid")(
+                    conv3
+                )
+            )
+        )
+        flat = Flatten()(conv4)
         dense1 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(256)(flat)))
+            Activation("relu")(BatchNormalization(axis=1)(Dense(1024)(flat)))
         )
         dense2 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(128)(dense1)))
+            Activation("relu")(BatchNormalization(axis=1)(Dense(512)(dense1)))
         )
 
         # policy, guessing the value of each valid action at the input state
