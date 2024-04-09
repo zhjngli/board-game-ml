@@ -205,7 +205,7 @@ class TicTacToeQLearner(SimpleQLearner[TicTacToeIR, Tuple[int, int]]):
 
 def _computer_play(
     g: TicTacToe, computer: Callable[[TicTacToeState], Tuple[int, int]], verbose=True
-):
+) -> Tuple[int, int]:
     if verbose:
         print(f"\n{g.show()}\n")
 
@@ -216,6 +216,8 @@ def _computer_play(
 
     if verbose:
         print(f"\ncomputer {p} plays at {r, c}!")
+
+    return (r, c)
 
 
 def _human_play(g: TicTacToe):
@@ -296,16 +298,25 @@ def _many_games(
     if desc is None:
         desc = f"playing {games} computer games"
     for _ in tqdm(range(games), desc=desc):
+        plays = []
         while not g.is_finished():
-            _computer_play(g, computer1, verbose=verbose)
+            r, c = _computer_play(g, computer1, verbose=verbose)
+            plays.append(("x", r, c))
             if g.is_finished():
                 break
-            _computer_play(g, computer2, verbose=verbose)
+            r, c = _computer_play(g, computer2, verbose=verbose)
+            plays.append(("o", r, c))
 
         if g.win(P1):
             x_wins += 1
+            print(f"\n{g.show()}\n")
+            for p in plays:
+                print(p)
         elif g.win(P2):
             o_wins += 1
+            print(f"\n{g.show()}\n")
+            for p in plays:
+                print(p)
         else:
             ties += 1
         g.reset()
@@ -417,19 +428,12 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
                 )
             )
         )
-        conv4 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(2, 2), padding="valid")(
-                    conv3
-                )
-            )
-        )
-        flat = Flatten()(conv4)
+        flat = Flatten()(conv3)
         dense1 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(1024)(flat)))
+            Activation("relu")(BatchNormalization(axis=1)(Dense(512)(flat)))
         )
         dense2 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(512)(dense1)))
+            Activation("relu")(BatchNormalization(axis=1)(Dense(256)(dense1)))
         )
 
         # policy, guessing the value of each valid action at the input state
@@ -529,7 +533,7 @@ def alpha_zero_many_games(games=1000):
         epsilon=1e-4,
     )
     nn = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn.load("best_model.weights.h5")
+    nn.load("temp_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, params)
 
     def play(s: TicTacToeState) -> Tuple[int, int]:
@@ -549,7 +553,7 @@ def a0_vs_mc_games(games=1000):
         epsilon=1e-4,
     )
     nn = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn.load("best_model.weights.h5")
+    nn.load("temp_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, params)
 
     def a0_play(s: TicTacToeState) -> Tuple[int, int]:
