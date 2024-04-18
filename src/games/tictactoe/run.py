@@ -1,8 +1,10 @@
 import os
 import pathlib
-from typing import Callable, List, Optional, Tuple
+import pickle
+from typing import Callable, List, NamedTuple, Optional, Tuple
 
 import numpy as np
+from hyperopt import Trials, fmin, hp, tpe  # type: ignore
 from keras.layers import (  # type: ignore
     Activation,
     BatchNormalization,
@@ -15,6 +17,7 @@ from keras.layers import (  # type: ignore
 )
 from keras.models import Model  # type: ignore
 from keras.optimizers import Adam  # type: ignore
+from sklearn.model_selection import train_test_split  # type: ignore
 from tqdm import tqdm
 from typing_extensions import override
 
@@ -393,58 +396,62 @@ def q_many_games(games=10000):
     _many_games(g, play1, play2, games, desc="simple q versus games")
 
 
-class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
-    NUM_FILTERS = 3  # TODO: change? currently it's 1 filter per possible value in the input board: -1, 0, 1
-    DROPOUT_RATE = 0.3
-    LEARN_RATE = 0.01
-    BATCH_SIZE = 64
-    EPOCHS = 10
+class TTTNNParams(NamedTuple):
+    conv_layers: int
+    conv_filters: int
+    dense_layers: int
+    dense_units: int
+    learning_rate: float
+    batch_size: int
+    epochs: int
+    dropout_rate: float
 
-    def __init__(self, model_folder: str) -> None:
+
+class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
+    def __init__(self, params: TTTNNParams, model_folder: str) -> None:
         super().__init__(model_folder)
+        self.params = params
 
         input = Input(shape=(3, 3), name="ttt_board")
         # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
         board = Reshape((3, 3, 1))(input)
-        # normalize along channels axis
-        conv1 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(2, 2), padding="same")(
-                    board
+        prev = board
+
+        # setup conv layers
+        for _ in range(self.params.conv_filters):
+            # normalize along channels axis
+            conv = Activation("relu")(
+                BatchNormalization(axis=3)(
+                    Conv2D(
+                        filters=self.params.conv_filters,
+                        kernel_size=(2, 2),
+                        padding="same",
+                    )(prev)
                 )
             )
-        )
-        conv2 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(2, 2), padding="same")(
-                    conv1
+            prev = conv
+        flat = Flatten()(prev)
+        prev = flat
+
+        # setup dense layers
+        for _ in range(self.params.dense_layers):
+            # TODO: divide units by 2 each layer?
+            dense = Dropout(rate=self.params.dropout_rate)(
+                Activation("relu")(
+                    BatchNormalization(axis=1)(Dense(self.params.dense_units)(prev))
                 )
             )
-        )
-        conv3 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(2, 2), padding="same")(
-                    conv2
-                )
-            )
-        )
-        flat = Flatten()(conv3)
-        dense1 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(512)(flat)))
-        )
-        dense2 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(256)(dense1)))
-        )
+            prev = dense
 
         # policy, guessing the value of each valid action at the input state
-        pi = Dense(TicTacToe.num_actions(), activation="softmax", name="pi")(dense2)
+        pi = Dense(TicTacToe.num_actions(), activation="softmax", name="pi")(prev)
         # value, guessing the value of the input state
-        v = Dense(1, activation="tanh", name="v")(dense2)
+        v = Dense(1, activation="tanh", name="v")(prev)
 
         self.model = Model(inputs=input, outputs=[pi, v])
         self.model.compile(
             loss=["categorical_crossentropy", "mean_squared_error"],
-            optimizer=Adam(learning_rate=self.LEARN_RATE),
+            optimizer=Adam(learning_rate=self.params.learning_rate),
             metrics={"pi": ["accuracy", "categorical_crossentropy"], "v": ["mse"]},
         )
         self.model.summary()
@@ -459,8 +466,8 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         self.model.fit(
             x=input_boards,
             y=[target_pis, target_vs],
-            batch_size=self.BATCH_SIZE,
-            epochs=self.EPOCHS,
+            batch_size=self.params.batch_size,
+            epochs=self.params.epochs,
             shuffle=True,
         )
 
@@ -487,6 +494,94 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         return self.model.get_weights()
 
 
+orig_nn_params: TTTNNParams = TTTNNParams(
+    conv_layers=3,
+    conv_filters=3,  # TODO: change? currently it's 1 filter per possible value in the input board: -1, 0, 1
+    dense_layers=2,
+    dense_units=512,
+    learning_rate=0.01,
+    batch_size=64,
+    epochs=10,
+    dropout_rate=0.3,
+)
+
+best_nn_params: TTTNNParams = TTTNNParams(
+    conv_layers=1,
+    conv_filters=16,
+    dense_layers=3,
+    dense_units=16,
+    learning_rate=0.03992681016370753,
+    batch_size=64,
+    epochs=10,
+    dropout_rate=0.3286273710548962,
+)
+
+
+def bayesian_optimization():
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    space = {
+        "num_conv_layers": hp.choice("num_conv_layers", [0, 1, 2, 3, 4, 5]),
+        "num_conv_filters": hp.randint("num_conv_filters", 1, 17),
+        "num_dense_layers": hp.choice("num_dense_layers", [0, 1, 2, 3, 4, 5]),
+        "num_dense_units": hp.choice(
+            "num_dense_units", [16, 32, 64, 128, 256, 512, 1024]
+        ),
+        "learning_rate": hp.loguniform("learning_rate", np.log(0.0001), np.log(0.1)),
+        "batch_size": hp.choice("batch_size", [16, 32, 64, 128]),
+        "epochs": hp.choice("epochs", [10, 20, 30]),
+        "dropout_rate": hp.uniform("dropout_rate", 0, 0.5),
+    }
+
+    def objective(params):
+        nn_params = TTTNNParams(
+            conv_layers=params["num_conv_layers"],
+            conv_filters=params["num_conv_filters"],
+            dense_layers=params["num_dense_layers"],
+            dense_units=params["num_dense_units"],
+            learning_rate=params["learning_rate"],
+            batch_size=params["batch_size"],
+            epochs=params["epochs"],
+            dropout_rate=params["dropout_rate"],
+        )
+        model = TTTNeuralNetwork(
+            params=nn_params, model_folder=f"{cur_dir}/opt_models/"
+        )
+        with open(
+            f"{cur_dir}/a0_training_examples/training_examples_0000034.pkl", "rb"
+        ) as file:
+            training_examples = pickle.load(file)
+
+        training_data = [d for game_data in training_examples for d in game_data]
+        inputs, outputs = list(zip(*training_data))
+        input_boards = np.asarray([input.board for input in inputs])
+        target_pis = np.asarray([output.policy for output in outputs])
+        target_vs = np.asarray([output.value for output in outputs])
+
+        input_train, input_val, pi_train, pi_val, v_train, v_val = train_test_split(
+            input_boards, target_pis, target_vs, test_size=0.2, random_state=42
+        )
+        history = model.model.fit(
+            input_train,
+            [pi_train, v_train],
+            batch_size=params["batch_size"],
+            epochs=params["epochs"],
+            validation_data=(input_val, pi_val, v_val),
+            verbose=0,
+        )
+
+        print(f"val loss history: {history.history['val_loss']}")
+        val_loss = history.history["val_loss"][-1]
+        return val_loss
+
+    max_evals = 20
+    trials = Trials()
+    best_params = fmin(
+        objective, space, algo=tpe.suggest, max_evals=max_evals, trials=trials
+    )
+
+    print("Best hyperparameters:", best_params)
+
+
 def alpha_zero_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     mcts_params = MCTSParameters(
@@ -496,7 +591,9 @@ def alpha_zero_trained_game():
     )
     a0 = AlphaZero(
         TicTacToe(),
-        TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
+        TTTNeuralNetwork(
+            params=orig_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
+        ),
         A0Parameters(
             temp_threshold=1,
             pit_games=100,
@@ -532,7 +629,9 @@ def alpha_zero_many_games(games=1000):
         cpuct=1,
         epsilon=1e-4,
     )
-    nn = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn = TTTNeuralNetwork(
+        params=orig_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
+    )
     nn.load("temp_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, params)
 
@@ -552,7 +651,9 @@ def a0_vs_mc_games(games=1000):
         cpuct=1,
         epsilon=1e-4,
     )
-    nn = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn = TTTNeuralNetwork(
+        params=orig_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
+    )
     nn.load("temp_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, params)
 
