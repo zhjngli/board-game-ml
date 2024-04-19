@@ -173,9 +173,9 @@ orig_nn_params: DP3NNParams = DP3NNParams(
 def bayesian_optimization() -> None:
     cur_dir = pathlib.Path(__file__).parent.resolve()
     space = {
-        "num_conv_layers": hp.randint("num_conv_layers", 0, 10),
+        "num_conv_layers": hp.randint("num_conv_layers", 1, 10),
         "num_conv_filters": hp.randint("num_conv_filters", 1, 65),
-        "num_dense_layers": hp.randint("num_dense_layers", 0, 10),
+        "num_dense_layers": hp.randint("num_dense_layers", 1, 10),
         "num_dense_units": hp.choice(
             "num_dense_units", [16, 32, 64, 128, 256, 512, 1024]
         ),
