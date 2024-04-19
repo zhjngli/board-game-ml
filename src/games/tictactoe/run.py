@@ -574,7 +574,7 @@ def bayesian_optimization():
             [pi_train, v_train],
             batch_size=params["batch_size"],
             epochs=params["epochs"],
-            validation_data=(input_val, pi_val, v_val),
+            validation_data=(input_val, [pi_val, v_val]),
             verbose=0,
         )
 
@@ -582,16 +582,17 @@ def bayesian_optimization():
         params_to_val_hist.append({"params": params, "val_loss": val_loss_history})
 
         val_loss_history = np.asarray(val_loss_history)
-        non_negative_losses = val_loss_history[val_loss_history >= 0]
-        mean_non_neg_loss = (
-            np.mean(non_negative_losses) if len(non_negative_losses) > 0 else np.inf
-        )
-        return mean_non_neg_loss
+        return val_loss_history[-1]
+        # non_negative_losses = val_loss_history[val_loss_history >= 0]
+        # mean_non_neg_loss = (
+        #     np.mean(non_negative_losses) if len(non_negative_losses) > 0 else np.inf
+        # )
+        # return mean_non_neg_loss
 
     with open(params_file, "wb") as file:
         pickle.dump(params_to_val_hist, file)
 
-    max_evals = 200
+    max_evals = 20
     trials = Trials()
     best_params = fmin(
         objective, space, algo=tpe.suggest, max_evals=max_evals, trials=trials
