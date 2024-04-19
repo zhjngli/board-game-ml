@@ -4,7 +4,7 @@ import pickle
 from typing import Callable, List, NamedTuple, Optional, Tuple
 
 import numpy as np
-from hyperopt import Trials, fmin, hp, tpe  # type: ignore
+from hyperopt import STATUS_OK, Trials, fmin, hp, tpe  # type: ignore
 from keras.layers import (  # type: ignore
     Activation,
     BatchNormalization,
@@ -577,24 +577,48 @@ def bayesian_optimization():
         val_loss_history = history.history["val_loss"]
         params_to_val_hist.append({"params": params, "val_loss": val_loss_history})
 
-        val_loss_history = np.asarray(val_loss_history)
-        return val_loss_history[-1]
-        # non_negative_losses = val_loss_history[val_loss_history >= 0]
-        # mean_non_neg_loss = (
-        #     np.mean(non_negative_losses) if len(non_negative_losses) > 0 else np.inf
-        # )
-        # return mean_non_neg_loss
+        return {
+            "loss": val_loss_history[-1],
+            "status": STATUS_OK,
+            "params": params,
+            "val_loss_hist": val_loss_history,
+        }
 
     with open(params_file, "wb") as file:
         pickle.dump(params_to_val_hist, file)
 
     max_evals = 100
     trials = Trials()
-    best_params = fmin(
-        objective, space, algo=tpe.suggest, max_evals=max_evals, trials=trials
-    )
+    with open("trials.pkl", "wb") as f:
+        pickle.dump(trials, f)
+    # try:
+    #     best_params = fmin(
+    #         objective, space, algo=tpe.suggest, max_evals=max_evals, trials=trials
+    #     )
+    #     print("Best hyperparameters:", best_params)
+    # except Exception as e:
+    #     print(e)
+    #     for k, v in trials.best_trial:
+    #         print(k, v)
+    #     print(trials.best_trial["result"]["params"])
+    for i in range(max_evals):
+        try:
+            best = fmin(
+                objective,
+                space=space,
+                algo=tpe.suggest,
+                max_evals=len(trials.trials) + 1,
+                trials=trials,
+            )
+            with open("trials.pkl", "wb") as f:
+                pickle.dump(trials, f)
 
-    print("Best hyperparameters:", best_params)
+            print(f"best params on trial {i}: {best}")
+
+        except Exception as e:
+            print("Exception occurred:", e)
+            with open("trials.pkl", "rb") as f:
+                trials = pickle.load(f)
 
 
 def alpha_zero_trained_game():
