@@ -505,21 +505,6 @@ orig_nn_params: TTTNNParams = TTTNNParams(
     dropout_rate=0.3,
 )
 
-last_epoch_nn_params: TTTNNParams = TTTNNParams(
-    conv_layers=1,
-    conv_filters=16,
-    dense_layers=3,
-    dense_units=16,
-    learning_rate=0.03992681016370753,
-    batch_size=64,
-    epochs=10,
-    dropout_rate=0.3286273710548962,
-)
-
-# last_epoch = {'batch_size': 0, 'dropout_rate': 0.46415269539215526, 'epochs': 2, 'learning_rate': 0.02913969524611797, 'num_conv_filters': 14, 'num_conv_layers': 0, 'num_dense_layers': 3, 'num_dense_units': 5}
-# smallest_non_neg = {'batch_size': 3, 'dropout_rate': 0.42541226124361603, 'epochs': 2, 'learning_rate': 0.0055205161259351855, 'num_conv_filters': 15, 'num_conv_layers': 2, 'num_dense_layers': 3, 'num_dense_units': 4}
-# last_non_neg = {'batch_size': 2, 'dropout_rate': 0.18153878722392047, 'epochs': 0, 'learning_rate': 0.00659252725172198, 'num_conv_filters': 15, 'num_conv_layers': 0, 'num_dense_layers': 2, 'num_dense_units': 0}
-
 
 def print_params_vals_hist():
     cur_dir = pathlib.Path(__file__).parent.resolve()
@@ -535,9 +520,9 @@ def print_params_vals_hist():
 def bayesian_optimization():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     space = {
-        "num_conv_layers": hp.randint("num_conv_layers", 0, 6),
+        "num_conv_layers": hp.randint("num_conv_layers", 1, 6),
         "num_conv_filters": hp.randint("num_conv_filters", 1, 17),
-        "num_dense_layers": hp.randint("num_dense_layers", 0, 6),
+        "num_dense_layers": hp.randint("num_dense_layers", 1, 6),
         "num_dense_units": hp.choice("num_dense_units", [16, 32, 64, 128, 256, 512]),
         "learning_rate": hp.loguniform("learning_rate", np.log(0.0001), np.log(0.1)),
         "batch_size": hp.choice("batch_size", [32, 64, 128, 256]),
@@ -603,7 +588,7 @@ def bayesian_optimization():
     with open(params_file, "wb") as file:
         pickle.dump(params_to_val_hist, file)
 
-    max_evals = 200
+    max_evals = 100
     trials = Trials()
     best_params = fmin(
         objective, space, algo=tpe.suggest, max_evals=max_evals, trials=trials
