@@ -588,10 +588,16 @@ def bayesian_optimization():
         pickle.dump(params_to_val_hist, file)
 
     max_evals = 100
-    trials = Trials()
     trials_file = f"{cur_dir}/trials.pkl"
+    if os.path.isfile(trials_file):
+        with open(trials_file, "rb") as f:
+            trials = pickle.load(f)
+    else:
+        trials = Trials()
+
     with open(trials_file, "wb") as f:
         pickle.dump(trials, f)
+
     for i in range(max_evals):
         try:
             best = fmin(
