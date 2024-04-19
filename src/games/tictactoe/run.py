@@ -589,18 +589,9 @@ def bayesian_optimization():
 
     max_evals = 100
     trials = Trials()
-    with open("trials.pkl", "wb") as f:
+    trials_file = f"{cur_dir}/trials.pkl"
+    with open(trials_file, "wb") as f:
         pickle.dump(trials, f)
-    # try:
-    #     best_params = fmin(
-    #         objective, space, algo=tpe.suggest, max_evals=max_evals, trials=trials
-    #     )
-    #     print("Best hyperparameters:", best_params)
-    # except Exception as e:
-    #     print(e)
-    #     for k, v in trials.best_trial:
-    #         print(k, v)
-    #     print(trials.best_trial["result"]["params"])
     for i in range(max_evals):
         try:
             best = fmin(
@@ -610,14 +601,17 @@ def bayesian_optimization():
                 max_evals=len(trials.trials) + 1,
                 trials=trials,
             )
-            with open("trials.pkl", "wb") as f:
+            with open(trials_file, "wb") as f:
                 pickle.dump(trials, f)
 
             print(f"best params on trial {i}: {best}")
+            print(f"params: {trials.best_trial['result']['params']}")
+            print(f"loss: {trials.best_trial['result']['loss']}")
+            print(f"hist: {trials.best_trial['result']['val_loss_hist']}")
 
         except Exception as e:
             print("Exception occurred:", e)
-            with open("trials.pkl", "rb") as f:
+            with open(trials_file, "rb") as f:
                 trials = pickle.load(f)
 
 
