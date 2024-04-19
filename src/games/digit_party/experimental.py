@@ -284,6 +284,8 @@ def bayesian_optimization() -> None:
     max_evals = 20
     trials = Trials()
     trials_file = f"{cur_dir}/trials.pkl"
+    with open(trials_file, "wb") as trials_pkl:
+        pickle.dump(trials, trials_pkl)
     for i in range(max_evals):
         try:
             best = fmin(
@@ -297,14 +299,14 @@ def bayesian_optimization() -> None:
                 pickle.dump(trials, trials_pkl)
 
             print(f"best params on trial {i}: {best}")
+            print(f"params: {trials.best_trial['result']['params']}")
+            print(f"loss: {trials.best_trial['result']['loss']}")
+            print(f"hist: {trials.best_trial['result']['val_loss_hist']}")
 
         except Exception as e:
             print("Exception occurred:", e)
-            if os.path.isfile(trials_file):
-                with open(trials_file, "rb") as read_trials:
-                    trials = pickle.load(read_trials)
-            else:
-                trials = Trials()
+            with open(trials_file, "rb") as read_trials:
+                trials = pickle.load(read_trials)
 
 
 def deep_q_3x3_chunk_trained_game() -> None:  # noqa: C901
