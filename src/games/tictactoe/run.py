@@ -505,7 +505,7 @@ orig_nn_params: TTTNNParams = TTTNNParams(
     dropout_rate=0.3,
 )
 
-best_nn_params: TTTNNParams = TTTNNParams(
+last_epoch_nn_params: TTTNNParams = TTTNNParams(
     conv_layers=1,
     conv_filters=16,
     dense_layers=3,
@@ -516,21 +516,30 @@ best_nn_params: TTTNNParams = TTTNNParams(
     dropout_rate=0.3286273710548962,
 )
 
+# last_epoch = {'batch_size': 0, 'dropout_rate': 0.46415269539215526, 'epochs': 2, 'learning_rate': 0.02913969524611797, 'num_conv_filters': 14, 'num_conv_layers': 0, 'num_dense_layers': 3, 'num_dense_units': 5}
+# smallest_non_neg = {'batch_size': 3, 'dropout_rate': 0.42541226124361603, 'epochs': 2, 'learning_rate': 0.0055205161259351855, 'num_conv_filters': 15, 'num_conv_layers': 2, 'num_dense_layers': 3, 'num_dense_units': 4}
+# last_non_neg = {'batch_size': 2, 'dropout_rate': 0.18153878722392047, 'epochs': 0, 'learning_rate': 0.00659252725172198, 'num_conv_filters': 15, 'num_conv_layers': 0, 'num_dense_layers': 2, 'num_dense_units': 0}
+
 
 def bayesian_optimization():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     space = {
-        "num_conv_layers": hp.choice("num_conv_layers", [0, 1, 2, 3, 4, 5]),
+        "num_conv_layers": hp.randint("num_conv_layers", 0, 6),
         "num_conv_filters": hp.randint("num_conv_filters", 1, 17),
-        "num_dense_layers": hp.choice("num_dense_layers", [0, 1, 2, 3, 4, 5]),
-        "num_dense_units": hp.choice(
-            "num_dense_units", [16, 32, 64, 128, 256, 512, 1024]
-        ),
+        "num_dense_layers": hp.randint("num_dense_layers", 0, 6),
+        "num_dense_units": hp.choice("num_dense_units", [16, 32, 64, 128, 256, 512]),
         "learning_rate": hp.loguniform("learning_rate", np.log(0.0001), np.log(0.1)),
-        "batch_size": hp.choice("batch_size", [16, 32, 64, 128]),
+        "batch_size": hp.choice("batch_size", [32, 64, 128, 256]),
         "epochs": hp.choice("epochs", [10, 20, 30]),
         "dropout_rate": hp.uniform("dropout_rate", 0, 0.5),
     }
+
+    params_file = f"{cur_dir}/opt.pkl"
+    if os.path.isfile(params_file):
+        with open(params_file, "rb") as file:
+            params_to_val_hist = pickle.load(file)
+    else:
+        params_to_val_hist = []
 
     def objective(params):
         nn_params = TTTNNParams(
@@ -569,11 +578,20 @@ def bayesian_optimization():
             verbose=0,
         )
 
-        print(f"val loss history: {history.history['val_loss']}")
-        val_loss = history.history["val_loss"][-1]
-        return val_loss
+        val_loss_history = history.history["val_loss"]
+        params_to_val_hist.append({"params": params, "val_loss": val_loss_history})
 
-    max_evals = 20
+        val_loss_history = np.asarray(val_loss_history)
+        non_negative_losses = val_loss_history[val_loss_history >= 0]
+        mean_non_neg_loss = (
+            np.mean(non_negative_losses) if len(non_negative_losses) > 0 else np.inf
+        )
+        return mean_non_neg_loss
+
+    with open(params_file, "wb") as file:
+        pickle.dump(params_to_val_hist, file)
+
+    max_evals = 200
     trials = Trials()
     best_params = fmin(
         objective, space, algo=tpe.suggest, max_evals=max_evals, trials=trials
