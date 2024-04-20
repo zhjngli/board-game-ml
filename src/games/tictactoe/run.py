@@ -505,16 +505,16 @@ orig_nn_params: TTTNNParams = TTTNNParams(
     dropout_rate=0.3,
 )
 
-
-def print_params_vals_hist():
-    cur_dir = pathlib.Path(__file__).parent.resolve()
-    params_file = f"{cur_dir}/opt.pkl"
-    with open(params_file, "rb") as file:
-        params_to_val_hist = pickle.load(file)
-    for d in params_to_val_hist:
-        print(f"params: {d['params']}")
-        print(f"val_loss: {d['val_loss']}")
-        print("\n")
+opt_nn_params: TTTNNParams = TTTNNParams(
+    conv_layers=5,
+    conv_filters=14,
+    dense_layers=5,
+    dense_units=256,
+    learning_rate=0.001978073214879719,
+    batch_size=128,
+    epochs=30,
+    dropout_rate=0.003438716989074303,
+)
 
 
 def bayesian_optimization():
@@ -529,13 +529,6 @@ def bayesian_optimization():
         "epochs": hp.choice("epochs", [10, 20, 30]),
         "dropout_rate": hp.uniform("dropout_rate", 0, 0.5),
     }
-
-    params_file = f"{cur_dir}/opt.pkl"
-    if os.path.isfile(params_file):
-        with open(params_file, "rb") as file:
-            params_to_val_hist = pickle.load(file)
-    else:
-        params_to_val_hist = []
 
     def objective(params):
         nn_params = TTTNNParams(
@@ -575,8 +568,6 @@ def bayesian_optimization():
         )
 
         val_loss_history = history.history["val_loss"]
-        params_to_val_hist.append({"params": params, "val_loss": val_loss_history})
-
         return {
             "loss": val_loss_history[-1],
             "status": STATUS_OK,
@@ -584,10 +575,7 @@ def bayesian_optimization():
             "val_loss_hist": val_loss_history,
         }
 
-    with open(params_file, "wb") as file:
-        pickle.dump(params_to_val_hist, file)
-
-    max_evals = 100
+    iters = 100
     trials_file = f"{cur_dir}/trials.pkl"
     if os.path.isfile(trials_file):
         with open(trials_file, "rb") as f:
@@ -598,7 +586,7 @@ def bayesian_optimization():
     with open(trials_file, "wb") as f:
         pickle.dump(trials, f)
 
-    for i in range(max_evals):
+    for i in range(iters):
         try:
             best = fmin(
                 objective,
@@ -610,7 +598,7 @@ def bayesian_optimization():
             with open(trials_file, "wb") as f:
                 pickle.dump(trials, f)
 
-            print(f"best params on trial {i}: {best}")
+            print(f"best params on trial {i+1}: {best}")
             print(f"params: {trials.best_trial['result']['params']}")
             print(f"loss: {trials.best_trial['result']['loss']}")
             print(f"hist: {trials.best_trial['result']['val_loss_hist']}")
