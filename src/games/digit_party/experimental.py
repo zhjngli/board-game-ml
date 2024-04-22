@@ -1,3 +1,4 @@
+import math
 import os
 import pathlib
 import pickle
@@ -173,15 +174,15 @@ orig_nn_params: DP3NNParams = DP3NNParams(
 def bayesian_optimization() -> None:
     cur_dir = pathlib.Path(__file__).parent.resolve()
     space = {
-        "num_conv_layers": hp.randint("num_conv_layers", 1, 10),
-        "num_conv_filters": hp.randint("num_conv_filters", 1, 65),
-        "num_dense_layers": hp.randint("num_dense_layers", 1, 10),
-        "num_dense_units": hp.choice(
-            "num_dense_units", [16, 32, 64, 128, 256, 512, 1024]
+        "num_conv_layers": hp.uniformint("num_conv_layers", 0, 10),
+        "num_conv_filters": hp.uniformint("num_conv_filters", 1, 64),
+        "num_dense_layers": hp.uniformint("num_dense_layers", 0, 10),
+        "num_dense_units": hp.qloguniform(
+            "num_dense_units", np.log(1), np.log(2048), 1
         ),
         "learning_rate": hp.loguniform("learning_rate", np.log(0.0001), np.log(0.1)),
-        "batch_size": hp.choice("batch_size", [32, 64, 128, 256, 512]),
-        "epochs": hp.choice("epochs", [10, 20, 30, 40, 50]),
+        "batch_size": hp.qloguniform("batch_size", np.log(1), np.log(512), 1),
+        "epochs": hp.uniformint("epochs", 10, 50),
         "dropout_rate": hp.uniform("dropout_rate", 0, 0.5),
         "output_activation": hp.choice("output_activation", ["linear", "relu"]),
     }
@@ -211,13 +212,17 @@ def bayesian_optimization() -> None:
             training_data.append((state, DQNOutput(policy=pi, value=v)))
 
     def objective(params):
+        # force batch_size to be a power of 2
+        batch_size = int(2 ** round(math.log2(params["batch_size"])))
         dp_params = DP3NNParams(
             conv_layers=params["num_conv_layers"],
             conv_filters=params["num_conv_filters"],
             dense_layers=params["num_dense_layers"],
-            dense_units=params["num_dense_units"],
+            dense_units=int(
+                params["num_dense_units"]
+            ),  # qloguniform doesn't return int for some reason
             learning_rate=params["learning_rate"],
-            batch_size=params["batch_size"],
+            batch_size=batch_size,
             epochs=params["epochs"],
             dropout_rate=params["dropout_rate"],
             output_activation=params["output_activation"],
@@ -262,7 +267,7 @@ def bayesian_optimization() -> None:
         history = model.model.fit(
             [board_train, curr_train, next_train],
             [pi_train, v_train],
-            batch_size=params["batch_size"],
+            batch_size=batch_size,
             epochs=params["epochs"],
             validation_data=([board_val, curr_val, next_val], [pi_val, v_val]),
             verbose=0,
