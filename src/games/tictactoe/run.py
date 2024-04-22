@@ -1,3 +1,4 @@
+import math
 import os
 import pathlib
 import pickle
@@ -520,24 +521,28 @@ opt_nn_params: TTTNNParams = TTTNNParams(
 def bayesian_optimization():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     space = {
-        "num_conv_layers": hp.randint("num_conv_layers", 1, 6),
-        "num_conv_filters": hp.randint("num_conv_filters", 1, 17),
-        "num_dense_layers": hp.randint("num_dense_layers", 1, 6),
-        "num_dense_units": hp.choice("num_dense_units", [16, 32, 64, 128, 256, 512]),
+        "num_conv_layers": hp.uniformint("num_conv_layers", 0, 5),
+        "num_conv_filters": hp.uniformint("num_conv_filters", 1, 16),
+        "num_dense_layers": hp.uniformint("num_dense_layers", 0, 5),
+        "num_dense_units": hp.qloguniform(
+            "num_dense_units", np.log(1), np.log(512), 1
+        ),
         "learning_rate": hp.loguniform("learning_rate", np.log(0.0001), np.log(0.1)),
-        "batch_size": hp.choice("batch_size", [32, 64, 128, 256]),
-        "epochs": hp.choice("epochs", [10, 20, 30]),
+        "batch_size": hp.qloguniform("batch_size", np.log(1), np.log(256), 1),
+        "epochs": hp.uniformint("epochs", 10, 30),
         "dropout_rate": hp.uniform("dropout_rate", 0, 0.5),
     }
 
     def objective(params):
+        # force batch_size to be a power of 2
+        batch_size = int(2 ** round(math.log2(params["batch_size"])))
         nn_params = TTTNNParams(
             conv_layers=params["num_conv_layers"],
             conv_filters=params["num_conv_filters"],
             dense_layers=params["num_dense_layers"],
-            dense_units=params["num_dense_units"],
+            dense_units=int(params["num_dense_units"]),  # qloguniform doesn't return int for some reason
             learning_rate=params["learning_rate"],
-            batch_size=params["batch_size"],
+            batch_size=batch_size,
             epochs=params["epochs"],
             dropout_rate=params["dropout_rate"],
         )
@@ -561,7 +566,7 @@ def bayesian_optimization():
         history = model.model.fit(
             input_train,
             [pi_train, v_train],
-            batch_size=params["batch_size"],
+            batch_size=batch_size,
             epochs=params["epochs"],
             validation_data=(input_val, [pi_val, v_val]),
             verbose=0,
