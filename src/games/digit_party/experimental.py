@@ -281,7 +281,7 @@ def bayesian_optimization() -> None:
     with open(params_file, "wb") as f:
         pickle.dump(params_to_val_hist, f)
 
-    max_evals = 20
+    max_evals = 100
     trials_file = f"{cur_dir}/trials.pkl"
     if os.path.isfile(trials_file):
         with open(trials_file, "rb") as pickle_file:
