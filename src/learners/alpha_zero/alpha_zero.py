@@ -34,15 +34,14 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self,
         game: Game[State, Immutable],
         nn: NeuralNetwork[A0NNInput, A0NNOutput],
+        pn: NeuralNetwork[A0NNInput, A0NNOutput],
         params: A0Parameters,
         m_params: MCTSParameters,
         training_examples_folder: str,
     ) -> None:
         self.game = game
         self.nn = nn  # current neural network
-        self.pn = self.nn.__class__(
-            self.nn.model_folder
-        )  # previous neural network for self-play
+        self.pn = pn  # previous neural network for self-play
         self.m = MonteCarloTreeSearch(self.game, self.nn, m_params)
         self.training_history: List[Deque[Tuple[A0NNInput, A0NNOutput]]] = []
         self.training_examples_folder = training_examples_folder
