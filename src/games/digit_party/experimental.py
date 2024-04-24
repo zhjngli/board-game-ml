@@ -439,3 +439,10 @@ def deep_play_digit_party(games: int, n: int, nn: NeuralNetwork) -> None:
     computer_game(g, games, deepq_play)
     print(f"random: {random}")
     print(f"prediction: {prediction}")
+
+
+def main() -> None:
+    bayesian_optimization()
+    # deep_q_3x3_chunk_trained_game()
+    # deep_q_3x3_full_trained_game()
+    # deep_play_digit_party()

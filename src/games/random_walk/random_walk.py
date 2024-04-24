@@ -192,3 +192,7 @@ def monte_carlo_trained_game(training_episodes=10000):
         state_values = pickle.load(file)
         for i in range(g.l_bound * 3, g.r_bound * 3 + 1):
             print(f"state {i} has value {state_values[i]}")
+
+
+def main() -> None:
+    q_trained_game()

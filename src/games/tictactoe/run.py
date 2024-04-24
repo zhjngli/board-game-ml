@@ -717,3 +717,13 @@ def a0_vs_mc_games(games=1000):
         half,
         desc=f"P1: monte carlo. P2: alpha zero. games: {half}",
     )
+
+
+def main() -> None:
+    # monte_carlo_trained_game(training_episodes=1)
+    # monte_carlo_many_games()
+
+    # bayesian_optimization()
+    alpha_zero_trained_game()
+    alpha_zero_many_games()
+    a0_vs_mc_games()

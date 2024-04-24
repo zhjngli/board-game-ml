@@ -547,3 +547,8 @@ def deep_q_5x5_trained_game():
     computer_game(g, 1000, deepq_play)
     print("random actions: ", random)
     print("predicted actions: ", prediction)
+
+
+def main() -> None:
+    human_game()
+    q_trained_game(game_size=3, num_games=20_000_000)

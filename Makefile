@@ -1,7 +1,8 @@
 .PHONY: run clean install test lint format
 
+# e.g. make run ARGS="arg1 arg2"
 run:
-	pipenv run python src
+	pipenv run python src $(ARGS)
 
 clean:
 	rm -r build/ dist/ **/*.egg-info/ .mypy_cache/ .pytest_cache && find . -name __pycache__ -type d -exec rm -r {} \;

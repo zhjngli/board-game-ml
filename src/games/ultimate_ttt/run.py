@@ -408,3 +408,9 @@ def vs_alpha_zero_game():
 
     print(g.show())
     print("\ngame over!")
+
+
+def main() -> None:
+    # monte_carlo_trained_game(training_episodes=1)
+    alpha_zero_trained_game()
+    vs_alpha_zero_game()
