@@ -16,22 +16,14 @@
 # ttt_mc_trained_game(training_episodes=1)
 # ttt_mc_many_games()
 
-from games.tictactoe.run import (
-    a0_vs_mc_games,
-    alpha_zero_many_games,
-    alpha_zero_trained_game,
-    monte_carlo_many_games,
-)
-
-alpha_zero_trained_game()
-alpha_zero_many_games()
-a0_vs_mc_games()
-monte_carlo_many_games()
-
 # from games.ultimate_ttt.run import alpha_zero_trained_game
 
 # alpha_zero_trained_game()
 
-# from games.digit_party.run import deep_q_3x3_trained_game
+from games.digit_party.experimental import (
+    bayesian_optimization,
+    deep_q_3x3_full_trained_game,
+)
 
-# deep_q_3x3_trained_game()
+bayesian_optimization()
+deep_q_3x3_full_trained_game()

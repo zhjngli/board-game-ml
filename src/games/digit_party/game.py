@@ -183,6 +183,31 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         state.next = DigitParty.next_digits_from_digits(state.digits)
         return state
 
+    @staticmethod
+    def calc_score(ir: DigitPartyIR) -> int:
+        n = len(ir.board)
+        score = 0
+        for r in range(n):
+            for c in range(n):
+                d = ir.board[r][c]
+                for dr, dc in [
+                    (-1, -1),  # up left
+                    (-1, 0),  # up
+                    (-1, 1),  # up right
+                    (0, -1),  # left
+                    (0, 1),  # right
+                    (1, -1),  # down left
+                    (1, 0),  # down
+                    (1, 1),  # down right
+                ]:
+                    try:
+                        DigitParty._check_range(n, r + dr, c + dc)
+                        if ir.board[r + dr][c + dc] == d:
+                            score += d
+                    except ValueError:
+                        continue
+        return int(score / 2)  # counts each connection twice
+
     def is_finished(self) -> bool:
         return not self.digits and len(self.placements) == self.n * self.n
 
