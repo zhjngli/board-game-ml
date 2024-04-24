@@ -43,6 +43,7 @@ Consider implementing the following games and train them using an appropriate me
 
 ## References
 - [TicTacToe](https://github.com/ShangtongZhang/reinforcement-learning-an-introduction/blob/master/chapter01/tic_tac_toe.py) with a simple Monte Carlo learning implementation
+- [RL with TicTacToe](https://towardsdatascience.com/reinforcement-learning-implement-tictactoe-189582bea542)
 - [Ultimate TicTacToe](https://github.com/Arnav235/ultimate_tic-tac-toe_alphazero) with the AlphaZero algorithm
 - [Monte Carlo Tree Search](https://blog.theofekfoundation.org/artificial-intelligence/2016/06/27/what-is-the-monte-carlo-tree-search/)
 - [AlphaZero tutorial](https://web.stanford.edu/~surag/posts/alphazero.html)
