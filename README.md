@@ -20,6 +20,14 @@ The next two methods use a form of deep reinforcement learning with the introduc
 - [Alpha Zero](src/learners/alpha_zero/). Combines a neural network with monte carlo tree search so that the training is more optimized. Only needs to store the neural network weights (and self-play training examples, if preferred), so it's much more memory efficient than storing all the explored states.
 - [Deep Q Learning](src/learners/deep_q.py). Similar to q-learning, but it replaces the q-table with a neural network, drastically reducing the memory usage.
 
+### Bayesian Optimization
+
+I use bayesian optimization to tune my network parameters. It's not the most efficient since:
+1. The parameter space can be pretty large, and I have limited resources/time to search the whole space. And all this time is spent not even to train the network.
+1. Generally I need an objective set of training data to ensure that the objective function is accurate (minimizing the loss on a suboptimal set of training data is pointless). This is particularly tough for alpha zero cases where the network generates its own training data.
+
+However, bayesian optimization does seem promising for training Digit Party, as I have an objective set of training data from running naive q-learning.
+
 ### Games
 - A [random walk game](src/games/random_walk/random_walk.py) which scores points at the right bound and loses points at the left bound. This is trained with q-learning and a monte carlo method.
 - [Tic-tac-toe](src/games/tictactoe/tictactoe.py). This game can be successfully trained using the monte carlo learning method.
