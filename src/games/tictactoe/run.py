@@ -627,9 +627,8 @@ def alpha_zero_trained_game():
     )
     a0 = AlphaZero(
         TicTacToe(),
-        TTTNeuralNetwork(
-            params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
-        ),
+        TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"),
+        TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"),
         A0Parameters(
             temp_threshold=1,
             pit_games=100,
@@ -665,9 +664,7 @@ def alpha_zero_many_games(games=1000):
         cpuct=1,
         epsilon=1e-4,
     )
-    nn = TTTNeuralNetwork(
-        params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
-    )
+    nn = TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/")
     nn.load("temp_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, params)
 
@@ -687,9 +684,7 @@ def a0_vs_mc_games(games=1000):
         cpuct=1,
         epsilon=1e-4,
     )
-    nn = TTTNeuralNetwork(
-        params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
-    )
+    nn = TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/")
     nn.load("temp_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, params)
 
