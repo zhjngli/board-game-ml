@@ -300,6 +300,7 @@ def alpha_zero_trained_game():
     a0 = AlphaZero(
         UltimateTicTacToe(),
         UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
+        UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
         A0Parameters(
             temp_threshold=11,
             pit_games=20,
