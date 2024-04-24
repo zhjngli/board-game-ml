@@ -517,6 +517,10 @@ opt_nn_params: TTTNNParams = TTTNNParams(
     dropout_rate=0.003438716989074303,
 )
 
+# another run for optimal params
+# params: {'batch_size': 133.0, 'dropout_rate': 0.3932060170973059, 'epochs': 24, 'learning_rate': 0.0002459131490144507, 'num_conv_filters': 1, 'num_conv_layers': 1, 'num_dense_layers': 3, 'num_dense_units': 440.0}
+# loss: 0.5865626931190491
+
 
 def bayesian_optimization():
     cur_dir = pathlib.Path(__file__).parent.resolve()
@@ -524,9 +528,7 @@ def bayesian_optimization():
         "num_conv_layers": hp.uniformint("num_conv_layers", 0, 5),
         "num_conv_filters": hp.uniformint("num_conv_filters", 1, 16),
         "num_dense_layers": hp.uniformint("num_dense_layers", 0, 5),
-        "num_dense_units": hp.qloguniform(
-            "num_dense_units", np.log(1), np.log(512), 1
-        ),
+        "num_dense_units": hp.qloguniform("num_dense_units", np.log(1), np.log(512), 1),
         "learning_rate": hp.loguniform("learning_rate", np.log(0.0001), np.log(0.1)),
         "batch_size": hp.qloguniform("batch_size", np.log(1), np.log(256), 1),
         "epochs": hp.uniformint("epochs", 10, 30),
@@ -540,7 +542,9 @@ def bayesian_optimization():
             conv_layers=params["num_conv_layers"],
             conv_filters=params["num_conv_filters"],
             dense_layers=params["num_dense_layers"],
-            dense_units=int(params["num_dense_units"]),  # qloguniform doesn't return int for some reason
+            dense_units=int(
+                params["num_dense_units"]
+            ),  # qloguniform doesn't return int for some reason
             learning_rate=params["learning_rate"],
             batch_size=batch_size,
             epochs=params["epochs"],
@@ -624,7 +628,7 @@ def alpha_zero_trained_game():
     a0 = AlphaZero(
         TicTacToe(),
         TTTNeuralNetwork(
-            params=orig_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
+            params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
         ),
         A0Parameters(
             temp_threshold=1,
@@ -662,7 +666,7 @@ def alpha_zero_many_games(games=1000):
         epsilon=1e-4,
     )
     nn = TTTNeuralNetwork(
-        params=orig_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
+        params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
     )
     nn.load("temp_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, params)
@@ -684,7 +688,7 @@ def a0_vs_mc_games(games=1000):
         epsilon=1e-4,
     )
     nn = TTTNeuralNetwork(
-        params=orig_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
+        params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
     )
     nn.load("temp_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, params)
