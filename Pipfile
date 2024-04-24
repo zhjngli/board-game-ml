@@ -13,8 +13,8 @@ tensorflow = "*"
 keras = "*"
 tqdm = "*"
 types-tqdm = "*"
-scikit-learn = "*"
 hyperopt = "*"
+scikit-learn = "*"
 
 [dev-packages]
 mypy = "*"

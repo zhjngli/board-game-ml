@@ -10,10 +10,10 @@
 
 # random_walk_trained_game()
 
-# from games.tictactoe.tictactoe import monte_carlo_many_games as ttt_mc_many_games
-# from games.tictactoe.tictactoe import monte_carlo_trained_game as ttt_mc_trained_game
+# from games.tictactoe.run import monte_carlo_many_games as ttt_mc_many_games
+# from games.tictactoe.run import monte_carlo_trained_game as ttt_mc_trained_game
 
-# ttt_mc_trained_game(training_episodes=1000000)
+# ttt_mc_trained_game(training_episodes=1)
 # ttt_mc_many_games()
 
 # from games.ultimate_ttt.run import alpha_zero_trained_game
@@ -26,4 +26,4 @@ from games.digit_party.experimental import (
 )
 
 bayesian_optimization()
-# deep_q_3x3_full_trained_game()
+deep_q_3x3_full_trained_game()
