@@ -2,9 +2,10 @@
 An exploration of machine learning techniques (mostly reinforcement learning) applied to simple games.
 
 ## How to run
-Update [`src/__main__.py`](src/__main__.py) with whatever game you'd like to train and run `make run`. See the existing [file](src/__main__.py) for an example.
 
-All policy files are saved locally, so cloning the repo fresh will require training each agent.
+There's a very simple cli used to run the games. `make run` is a thin alias around `pipenv run python src`, which runs the cli defined in [`src/__main__.py`](src/__main__.py). The cli then calls the `main()` function in the corresponding game's run file. For example, `make run ARGS="ttt"` runs the `main()` function in [`src/games/tictactoe/run.py`](src/games/tictactoe/run.py).
+
+Some policy files are saved along with the repo, check each specific game for its corresponding policy files.
 
 ## What's been done
 
@@ -30,7 +31,7 @@ However, bayesian optimization does seem promising for training Digit Party, as 
 
 ### Games
 - A [random walk game](src/games/random_walk/random_walk.py) which scores points at the right bound and loses points at the left bound. This is trained with q-learning and a monte carlo method.
-- [Tic-tac-toe](src/games/tictactoe/tictactoe.py). This game can be successfully trained using the monte carlo learning method.
+- [Tic-tac-toe](src/games/tictactoe/tictactoe.py). This game can be successfully trained using the monte carlo learning method, and with alpha zero.
 - [Digit party](src/games/digit_party/digit_party.py). Though naive q-learning should be able to learn this game, it is intractable as the number of states is just too high. Deep q-learning should work better.
 - [Ultimate tic tac toe](src/games/ultimate_ttt/ultimate.py). Works ok with simple Monte Carlo method but even better with Alpha Zero.
 
@@ -46,7 +47,7 @@ Consider implementing the following games and train them using an appropriate me
 - refactor simple q and monte-carlo learners to use composition rather than inheritance. been lazy to do this
 - clean up functions in Ultimate/TTT game classes. function names could be better, and ordering/structuring could be better
 - logging with verbose option
-- command line interface for running games with different learning methods
+- expanding and optimizing the CLI
 - organize types
 
 ## References

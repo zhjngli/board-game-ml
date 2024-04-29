@@ -93,7 +93,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         last_ep = self.load_latest_model()
         self.load_training_history()
 
-        for i in range(last_ep + 1, self.training_episodes + 1):
+        for i in range(last_ep + 1, self.training_episodes):
             # self play
             self_play_data: Deque[Tuple[A0NNInput, A0NNOutput]] = deque(
                 [], maxlen=self.training_queue_length

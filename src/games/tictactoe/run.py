@@ -554,7 +554,7 @@ def bayesian_optimization():
             params=nn_params, model_folder=f"{cur_dir}/opt_models/"
         )
         with open(
-            f"{cur_dir}/a0_training_examples/training_examples_0000034.pkl", "rb"
+            f"{cur_dir}/a0_training_examples/training_examples_0000099.pkl", "rb"
         ) as file:
             training_examples = pickle.load(file)
 
@@ -618,13 +618,21 @@ def bayesian_optimization():
                 trials = pickle.load(f)
 
 
+training_mcts_params = MCTSParameters(
+    num_searches=100,
+    cpuct=1,
+    epsilon=1e-4,
+)
+
+mcts_params = MCTSParameters(
+    num_searches=1000,
+    cpuct=1,
+    epsilon=1e-4,
+)
+
+
 def alpha_zero_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
-    mcts_params = MCTSParameters(
-        num_searches=100,
-        cpuct=1,
-        epsilon=1e-4,
-    )
     a0 = AlphaZero(
         TicTacToe(),
         TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"),
@@ -638,13 +646,13 @@ def alpha_zero_trained_game():
             training_queue_length=10000,
             training_hist_max_len=20,
         ),
-        mcts_params,
+        training_mcts_params,
         training_examples_folder=f"{cur_dir}/a0_training_examples/",
     )
     a0.train()
 
     g = TicTacToe()
-    nn = TTTNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
+    nn = TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/")
     nn.load("best_model.weights.h5")
     mcts = MonteCarloTreeSearch(g, nn, mcts_params)
 
@@ -659,14 +667,9 @@ def alpha_zero_trained_game():
 def alpha_zero_many_games(games=1000):
     cur_dir = pathlib.Path(__file__).parent.resolve()
     g = TicTacToe()
-    params = MCTSParameters(
-        num_searches=100,
-        cpuct=1,
-        epsilon=1e-4,
-    )
     nn = TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/")
-    nn.load("temp_model.weights.h5")
-    mcts = MonteCarloTreeSearch(g, nn, params)
+    nn.load("best_model.weights.h5")
+    mcts = MonteCarloTreeSearch(g, nn, mcts_params)
 
     def play(s: TicTacToeState) -> Tuple[int, int]:
         return TicTacToe.from_action(
@@ -679,14 +682,9 @@ def alpha_zero_many_games(games=1000):
 def a0_vs_mc_games(games=1000):
     cur_dir = pathlib.Path(__file__).parent.resolve()
     g = TicTacToe()
-    params = MCTSParameters(
-        num_searches=100,
-        cpuct=1,
-        epsilon=1e-4,
-    )
     nn = TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/")
-    nn.load("temp_model.weights.h5")
-    mcts = MonteCarloTreeSearch(g, nn, params)
+    nn.load("best_model.weights.h5")
+    mcts = MonteCarloTreeSearch(g, nn, mcts_params)
 
     def a0_play(s: TicTacToeState) -> Tuple[int, int]:
         return TicTacToe.from_action(
