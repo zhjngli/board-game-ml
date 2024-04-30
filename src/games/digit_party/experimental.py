@@ -170,6 +170,28 @@ orig_nn_params: DP3NNParams = DP3NNParams(
     output_activation="linear",
 )
 
+# loss: 1.2920054197311401
+# hist: [9.498950958251953, 6.370762825012207, 4.946802616119385, 4.297098636627197, 3.036100387573242,
+#        3.330138683319092, 2.917084217071533, 3.261935234069824, 2.650658369064331, 3.483096122741699,
+#        3.8009915351867676, 2.3156142234802246, 3.857179880142212, 2.978402614593506, 2.801017999649048,
+#        2.6674540042877197, 1.7941356897354126, 2.2325198650360107, 2.1178977489471436, 1.8516639471054077,
+#        2.420323610305786, 1.977565050125122, 1.8339382410049438, 1.9122722148895264, 1.6410659551620483,
+#        2.3064727783203125, 1.7605277299880981, 1.6438183784484863, 2.3366291522979736, 1.83698570728302,
+#        2.1832854747772217, 1.6136173009872437, 1.4889086484909058, 2.3253819942474365, 2.1267433166503906,
+#        1.9452699422836304, 2.669285297393799, 2.0537526607513428, 1.6889313459396362, 1.7036519050598145,
+#        1.6063851118087769, 1.2920054197311401]
+opt_nn_params: DP3NNParams = DP3NNParams(
+    conv_layers=8,
+    conv_filters=14,
+    dense_layers=1,
+    dense_units=337,
+    learning_rate=0.0009647204266707786,
+    batch_size=64,
+    epochs=42,
+    dropout_rate=0.06842343999759844,
+    output_activation="linear",
+)
+
 
 def bayesian_optimization() -> None:
     cur_dir = pathlib.Path(__file__).parent.resolve()
@@ -320,24 +342,27 @@ def bayesian_optimization() -> None:
                 trials = pickle.load(read_trials)
 
 
+# code to chunk the full data from q-3x3.pkl
+def chunk_full_3x3_data() -> None:
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    with open(f"{cur_dir}/q-3x3.pkl", "rb") as file:
+        q_table: dict[DigitPartyIR, dict[DigitPartyPlacement, float]] = pickle.load(
+            file
+        )
+
+    keys = list(q_table.keys())
+    chunks = np.array_split(np.arange(len(keys)), 1000)
+    for i, chunk in enumerate(chunks):
+        chunked = {keys[ix]: q_table[keys[ix]] for ix in chunk}
+        with open(f"{cur_dir}/chunked_simple_q_data/{i:04d}_chunk.pkl", "wb") as file:
+            pickle.dump(chunked, file)
+
+
 def deep_q_3x3_chunk_trained_game() -> None:  # noqa: C901
     cur_dir = pathlib.Path(__file__).parent.resolve()
-
-    # code to chunk the full data from q-3x3.pkl
-    # with open(f"{cur_dir}/q-3x3.pkl", "rb") as file:
-    #     q_table: dict[DigitPartyIR, dict[DigitPartyPlacement, float]] = pickle.load(
-    #         file
-    #     )
-
-    # keys = list(q_table.keys())
-    # chunks = np.array_split(np.arange(len(keys)), 1000)
-    # for i, chunk in enumerate(chunks):
-    #     chunked = {keys[ix]: q_table[keys[ix]] for ix in chunk}
-    #     with open(f"{cur_dir}/chunked_simple_q_data/{i:04d}_chunk.pkl", "wb") as file:
-    #         pickle.dump(chunked, file)
-
     model_folder = f"{cur_dir}/experimental3x3_models/"
-    nn = DigitParty3x3NeuralNetwork(params=orig_nn_params, model_folder=model_folder)
+    nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
+
     latest = 0
     latest_model = None
     if not os.path.exists(model_folder):
@@ -346,9 +371,8 @@ def deep_q_3x3_chunk_trained_game() -> None:  # noqa: C901
         f = os.path.join(model_folder, filename)
         if os.path.isfile(f):
             try:
-                i = int(
-                    filename.split(".")[0].split("_")[-1]
-                )  # simple_q_data_incremental_{i:04d}.weights.h5
+                # simple_q_data_incremental_{i:04d}.weights.h5
+                i = int(filename.split(".")[0].split("_")[-1])
             except ValueError:
                 # any other model
                 continue
@@ -386,7 +410,7 @@ def deep_q_3x3_chunk_trained_game() -> None:  # noqa: C901
 def deep_q_3x3_full_trained_game() -> None:
     cur_dir = pathlib.Path(__file__).parent.resolve()
     model_folder = f"{cur_dir}/experimental3x3_models/"
-    nn = DigitParty3x3NeuralNetwork(params=orig_nn_params, model_folder=model_folder)
+    nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
 
     # could also load full data at once instead of loading each chunk
     training_data: List[Tuple[DigitPartyIR, DQNOutput]] = []
@@ -442,7 +466,6 @@ def deep_play_digit_party(games: int, n: int, nn: NeuralNetwork) -> None:
 
 
 def main() -> None:
-    bayesian_optimization()
-    # deep_q_3x3_chunk_trained_game()
-    # deep_q_3x3_full_trained_game()
-    # deep_play_digit_party()
+    # bayesian_optimization()
+    deep_q_3x3_chunk_trained_game()
+    deep_q_3x3_full_trained_game()
