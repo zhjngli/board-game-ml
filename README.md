@@ -30,9 +30,9 @@ I use bayesian optimization to tune my network parameters. It's not the most eff
 However, bayesian optimization does seem promising for training Digit Party, as I have an objective set of training data from running naive q-learning.
 
 ### Games
-- A [random walk game](src/games/random_walk/random_walk.py) which scores points at the right bound and loses points at the left bound. This is trained with q-learning and a monte carlo method.
-- [Tic-tac-toe](src/games/tictactoe/tictactoe.py). This game can be successfully trained using the monte carlo learning method, and with alpha zero.
-- [Digit party](src/games/digit_party/digit_party.py). Though naive q-learning should be able to learn this game, it is intractable as the number of states is just too high. Deep q-learning should work better.
+- A [random walk game](src/games/random_walk/README.md) which scores points at the right bound and loses points at the left bound. This is trained with q-learning and a monte carlo method.
+- [Tic-tac-toe](src/games/tictactoe/README.md). This game can be successfully trained using the monte carlo learning method, and with alpha zero.
+- [Digit party](src/games/digit_party/README.md). Though naive q-learning should be able to learn this game, it is intractable as the number of states is just too high. Deep q-learning should work better.
 - [Ultimate tic tac toe](src/games/ultimate_ttt/ultimate.py). Works ok with simple Monte Carlo method but even better with Alpha Zero.
 
 ### TODO
