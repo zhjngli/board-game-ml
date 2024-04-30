@@ -217,7 +217,7 @@ class DigitPartyQTrainer(DigitParty, Trainer):
         self.reset()
 
 
-def q_trained_game(game_size: int, num_games: int) -> None:
+def q_trained_game(game_size: int, num_episodes: int, num_games: int) -> None:
     # there's too many states in default digit party, so naive q learning is inexhaustive and doesn't work well
     # we can train a 3x3 game reasonably well, but it's very memory inefficient, since it needs to keep track
     # of all possible digit party states. after 20 million games, the policy file is about 5 GB
@@ -228,7 +228,7 @@ def q_trained_game(game_size: int, num_games: int) -> None:
         epsilon=0.5,
     )
     g = DigitPartyQTrainer(player=q, n=game_size)
-    g.train(episodes=0)
+    g.train(episodes=num_episodes)
 
     def q_play(state: DigitPartyState) -> DigitPartyPlacement:
         return q.choose_action(g.to_immutable(state), exploit=True)
@@ -551,4 +551,4 @@ def deep_q_5x5_trained_game():
 
 def main() -> None:
     human_game()
-    q_trained_game(game_size=3, num_games=20_000_000)
+    q_trained_game(game_size=3, num_episodes=20_000_000, num_games=100_000)
