@@ -1,6 +1,6 @@
 import argparse
 
-from games.digit_party import experimental as digit_party_exp
+from games.digit_party import deep_train as digit_party_exp
 from games.digit_party import run as digit_party
 from games.random_walk import random_walk
 from games.tictactoe import run as tictactoe

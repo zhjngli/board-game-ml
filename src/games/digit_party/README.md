@@ -8,11 +8,11 @@ Digit party as a game scales with complexity very very quickly, simply because o
 
 For the 3x3 game, this works reasonably well. For a totally untrained agent (placing digits randomly), here's the distribution of scores over about ~100,000 games:
 
-![an untrained agent playing 100,000 3x3 games follows a normal distribution around 50% score](./q-3x3-untrained.png "untrained 3x3 agent: games played per percent score")
+![an untrained agent playing 100,000 3x3 games follows a normal distribution around 50% score](./results/q-3x3-untrained.png "untrained 3x3 agent: games played per percent score")
 
 After training the simple q-agent on about 20,000,000 games, here is the resulting distribution:
 
-![a trained agent playing 100,000 3x3 games averages 90% and gets 100% more than 35% of the time](./q-3x3.png "trained 3x3 agent: games played per percent score")
+![a trained agent playing 100,000 3x3 games averages 90% and gets 100% more than 35% of the time](./results/q-3x3.png "trained 3x3 agent: games played per percent score")
 
 While this is an impressive result, the resulting policy file is nearly 5 gigabytes, and for that reason I haven't uploaded it or stored it anywhere.
 
@@ -20,7 +20,7 @@ While this is an impressive result, the resulting policy file is nearly 5 gigaby
 
 For the 5x5 game, using simple q-learning is pretty much intractable. There are just far too many state-action pairs to keep track of in a single policy file. It's theoretically doable, but I would need a lot of compute and memory to handle the training. I also think that it would take a few orders of magnitude more than 20,000,000 episodes to achieve a similar result as in the 3x3 case. Here's the distribution of scores of an untrained agent playing about 10,000 5x5 games:
 
-![an untrained agent playing 10,000 5x5 games follows a normal distribution around 27% score](./q-5x5-untrained.png)
+![an untrained agent playing 10,000 5x5 games follows a normal distribution around 27% score](./results/q-5x5-untrained.png)
 
 ## Deep Q-learning
 
