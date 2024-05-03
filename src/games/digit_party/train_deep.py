@@ -28,10 +28,15 @@ from games.digit_party.game import (
     DigitPartyPlacement,
     DigitPartyState,
 )
-from games.digit_party.run import computer_game
+from games.digit_party.run_helpers import computer_game
 from games.game import VALID
 from learners.deep_q import DQNOutput
 from nn.neural_network import NeuralNetwork
+
+"""
+Attempts to train a 3x3 digit party neural network using the data gathered by running the simple q training algorithm.
+Uses bayesian optimization to find a good set of neural network hyperparameters.
+"""
 
 
 class DP3NNParams(NamedTuple):
@@ -359,6 +364,9 @@ def chunk_full_3x3_data() -> None:
 
 
 def chunk_trained_3x3_game() -> None:  # noqa: C901
+    """
+    Incrementally trains the neural network using the chunked data.
+    """
     cur_dir = pathlib.Path(__file__).parent.resolve()
     model_folder = f"{cur_dir}/experimental3x3_models/"
     nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
@@ -415,9 +423,14 @@ def chunk_trained_3x3_game() -> None:  # noqa: C901
 
 
 def full_trained_3x3_game() -> None:
+    """
+    Trains the neural network using the full set of data from simple q training.
+
+    NOTE: changes the number of epochs to 10 because there's a tendency to glitch out without saving the neural network.
+    Plus the marginal gains seem diminishingly small.
+    """
     cur_dir = pathlib.Path(__file__).parent.resolve()
     model_folder = f"{cur_dir}/experimental3x3_models/"
-    # NOTE: changing epochs here cause it tends to glitch out, and it seems like marginal gains in terms of the loss
     opt_nn_params = DP3NNParams(
         conv_layers=8,
         conv_filters=14,
