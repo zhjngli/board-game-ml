@@ -95,7 +95,7 @@ class DeepQLearner(Generic[State, Immutable]):
             self.epsilon = self.calculate_epsilon(i)
 
             if i % self.episodes_per_model_save == 0:
-                self.predict_nn.save(f"ep_{i:07d}_model.h5")
+                self.predict_nn.save(f"ep_{i:07d}_model.weights.h5")
 
             if i % self.episodes_per_memory_save == 0:
                 self.save_memory(f"ep_{i:07d}_memory.pkl")

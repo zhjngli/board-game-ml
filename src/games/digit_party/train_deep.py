@@ -505,5 +505,5 @@ def main() -> None:
     cur_dir = pathlib.Path(__file__).parent.resolve()
     model_folder = f"{cur_dir}/experimental3x3_models/"
     nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
-    nn.load("simple_q_data.weights.h5")
+    nn.load("simple_q_data_incremental_0999.weights.h5")
     deep_play_digit_party(games=10000, n=3, nn=nn)

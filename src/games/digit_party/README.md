@@ -28,6 +28,24 @@ Here's where deep q-learning comes into play. The idea is that after training, t
 
 ### 3x3
 
+#### Guessing a neural network architecture
+
 I started with guessing some architecture and hyperparameters for the neural network, but found that while training, it was totally overfitting, and not learning properly at all. In many cases, the agent would have to fall back to a random action because the action it chose was actually invalid. So essentially, even after training, the agent wasn't much better than a random agent.
 
-Luckily, after training a simple q agent to play the 3x3 game, I have nearly 5 gigabytes of objective training data that can be used search for optimal hyperparameters. I've currently "chunked" the 5 gigabytes of training data, and using 1% to run a bayesian optimization algorithm to find optimal hyperparameters for the network.
+#### Finding optimal hyperparameters
+
+Luckily, after training a simple q agent to play the 3x3 game, I have nearly 5 gigabytes of objective training data that can be used search for optimal hyperparameters. I "chunked" the 5 gigabytes of training data into 1000 chunks, and using 1% (10 chunks) to run a bayesian optimization algorithm to find optimal hyperparameters for the network. These hyperparameters were much better than my original guess at the network architecture and hyperparameters, though it's still not perfect.
+
+For one agent, I took the training data from each of the 1000 chunks, and trained the neural network on each chunk incrementally. Here's the result of that agent playing 10,000 games:
+
+![a deep network trained on the chunks of training data, playing 10,000 3x3 games averages 70% score](./results/deep-3x3-1000-inc-10k-games.png "deep trained 3x3 agent: games played per percent score")
+
+For another agent, I trained it with the whole set of training data (all 1000 chunks). (However, I only ran it through 10 epochs, though the hyperparameters I found recommended 42 epochs. Training locally isn't very resilient, so there's possibility of it glitching out during training, without saving the neural network weights.) Here's the result of that agent playing 10,000 games:
+
+![a deep network trained on the full set of training data, playing 10,000 3x3 games averages 70% score](./results/deep-3x3-full-trained-10-epochs-10k-games.png "deep trained 3x3 agent: games played per percent score")
+
+Both agents clearly do better (averaging 70% score) than a totally untrained agent (which averages 50% score), though it still fails to live up to the agent trained with the simple q-learning method.
+
+#### Back to deep Q-learning
+
+The resulting hyperparameters are much more promising, so now I try to use them for the deep q-learning algorithm.
