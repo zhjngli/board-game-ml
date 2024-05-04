@@ -2,7 +2,7 @@ import copy
 import os
 import pickle
 from collections import deque
-from typing import Deque, Generic, NamedTuple, Tuple
+from typing import Deque, Generic, List, NamedTuple, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -46,12 +46,13 @@ class DeepQLearner(Generic[State, Immutable]):
         self,
         game: Game[State, Immutable],
         nn: NeuralNetwork[State, Policy],
+        target_nn: NeuralNetwork[State, Policy],
         params: DeepQParameters,
         memory_folder: str,
     ) -> None:
         self.game = game
         self.predict_nn = nn
-        self.target_nn = self.predict_nn.__class__(self.predict_nn.model_folder)
+        self.target_nn = target_nn
         self.memory: Deque[Tuple[State, Action, State, Reward, bool]] = deque(
             [], maxlen=params.memory_size
         )
@@ -118,8 +119,8 @@ class DeepQLearner(Generic[State, Immutable]):
             if np.random.sample() < self.epsilon:
                 a = np.random.choice(len(action_statuses))
             else:
-                pi = self.predict_nn.predict([state])[0]
-                a = int(np.argmax(pi))
+                dqn_out: DQNOutput = self.predict_nn.predict([state])[0]
+                a = int(np.argmax(dqn_out.policy))
                 # if not np.isin(valid_actions, a).any():
                 #     # TODO: might be an issue with my model, not the implementation?
                 #     # TODO: punish invalid actions?
@@ -137,14 +138,13 @@ class DeepQLearner(Generic[State, Immutable]):
             except ValueError:
                 # punish invalid actions
                 next_state = copy.deepcopy(state)
-                reward = 0
+                reward = -1
                 game_end = False
 
             mem = (state, a, next_state, reward, game_end)
             self.memory.append(mem)
 
             # replay memory
-            # TODO: probably get rid of this altogether?
             if self.steps % self.steps_to_train_shortterm == 0:
                 self.replay_memory(np.array([mem]))
 
@@ -172,20 +172,22 @@ class DeepQLearner(Generic[State, Immutable]):
         rewards = minibatch[:, 3]
         game_ends = minibatch[:, 4]
 
-        qs = self.predict_nn.predict(list(states))
-        next_qs = self.target_nn.predict(list(next_states))
+        dqn_outs: List[DQNOutput] = self.predict_nn.predict(list(states))
+        next_dqn_outs: List[DQNOutput] = self.target_nn.predict(list(next_states))
+
+        next_qs = np.array([out.policy for out in next_dqn_outs])
 
         max_next_qs = np.where(
             game_ends, rewards, rewards + self.gamma * np.max(next_qs, axis=1)
         )
         # np.arange(len(qs)) instead of `:`?
-        for i in range(len(qs)):
-            qs[i][actions[i]] = (1 - self.alpha) * qs[i][
+        for i in range(len(dqn_outs)):
+            dqn_outs[i].policy[actions[i]] = (1 - self.alpha) * dqn_outs[i].policy[
                 actions[i]
             ] + self.alpha * max_next_qs[i]
 
         # TODO: make train type signature flexible so i don't have to convert to list?
-        self.predict_nn.train(list(zip(states, qs)))
+        self.predict_nn.train(list(zip(states, dqn_outs)))
 
     def load_latest_model(self) -> int:
         """

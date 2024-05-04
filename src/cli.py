@@ -1,7 +1,8 @@
 import argparse
 
-from games.digit_party import train_deep as digit_party_exp
-from games.digit_party import train_q_simple as digit_party
+from games.digit_party import train_deep as digit_party_deep
+from games.digit_party import train_q_deep as digit_party_deep_q
+from games.digit_party import train_q_simple as digit_party_simple_q
 from games.random_walk import random_walk
 from games.tictactoe import run as tictactoe
 from games.ultimate_ttt import run as ultimate_ttt
@@ -30,16 +31,25 @@ def _define_parser() -> argparse.ArgumentParser:
     sub_ultimate_ttt.set_defaults(function=ultimate_ttt.main)
 
     sub_digit_party = subparsers.add_parser(
-        "digit_party", aliases=["dp"], help="run digit party"
+        "digit_party_simple_q",
+        aliases=["dpq", "dp_simple_q"],
+        help="run digit party with simple q learning",
     )
-    sub_digit_party.set_defaults(function=digit_party.main)
+    sub_digit_party.set_defaults(function=digit_party_simple_q.main)
 
-    sub_digit_party_exp = subparsers.add_parser(
-        "digit_party_experimental",
-        aliases=["dpe", "dp_exp"],
-        help="run digit party experimental",
+    sub_digit_party_deep = subparsers.add_parser(
+        "digit_party_deep",
+        aliases=["dpd", "dp_deep"],
+        help="run digit party with deep learning (NOT q learning. uses data from simple q learning to train)",
     )
-    sub_digit_party_exp.set_defaults(function=digit_party_exp.main)
+    sub_digit_party_deep.set_defaults(function=digit_party_deep.main)
+
+    sub_digit_party_deep_q = subparsers.add_parser(
+        "digit_party_deep_q",
+        aliases=["dpdq", "dp_deep_q"],
+        help="run digit party with deep q learning",
+    )
+    sub_digit_party_deep_q.set_defaults(function=digit_party_deep_q.main)
 
     return parser
 
