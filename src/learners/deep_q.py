@@ -45,8 +45,8 @@ class DeepQLearner(Generic[State, Immutable]):
     def __init__(
         self,
         game: Game[State, Immutable],
-        nn: NeuralNetwork[State, Policy],
-        target_nn: NeuralNetwork[State, Policy],
+        nn: NeuralNetwork[State, DQNOutput],
+        target_nn: NeuralNetwork[State, DQNOutput],
         params: DeepQParameters,
         memory_folder: str,
     ) -> None:

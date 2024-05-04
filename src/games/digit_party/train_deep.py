@@ -422,27 +422,48 @@ def chunk_trained_3x3_game() -> None:  # noqa: C901
     deep_play_digit_party(100, 3, nn)
 
 
-def full_trained_3x3_game() -> None:
+def full_trained_3x3_game() -> None:  # noqa: C901
     """
     Trains the neural network using the full set of data from simple q training.
 
-    NOTE: changes the number of epochs to 10 because there's a tendency to glitch out without saving the neural network.
-    Plus the marginal gains seem diminishingly small.
+    NOTE: iterates the epochs to 42 manually because there's a tendency to glitch out without saving the neural network.
+    This may actually affect the efficacy of the network...
     """
     cur_dir = pathlib.Path(__file__).parent.resolve()
     model_folder = f"{cur_dir}/experimental3x3_models/"
-    opt_nn_params = DP3NNParams(
+    nn_params = DP3NNParams(
         conv_layers=8,
         conv_filters=14,
         dense_layers=1,
         dense_units=337,
         learning_rate=0.0009647204266707786,
         batch_size=64,
-        epochs=10,
+        epochs=1,
         dropout_rate=0.06842343999759844,
         output_activation="linear",
     )
-    nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
+    nn = DigitParty3x3NeuralNetwork(params=nn_params, model_folder=model_folder)
+
+    epoch = 1
+    latest_model = None
+    if not os.path.exists(model_folder):
+        os.makedirs(model_folder)
+    for filename in os.listdir(model_folder):
+        f = os.path.join(model_folder, filename)
+        if os.path.isfile(f):
+            try:
+                # simple_q_data_{i:04d}_epochs.weights.h5
+                i = int(filename.split(".")[0].split("_")[-2])
+            except ValueError:
+                # any other model
+                continue
+            if i >= epoch:
+                epoch = i
+                latest_model = f
+
+    if latest_model:
+        print(f"loading {latest_model}")
+        nn.load(latest_model)
 
     # could also load full data at once instead of loading each chunk
     training_data: List[Tuple[DigitPartyIR, DQNOutput]] = []
@@ -461,8 +482,15 @@ def full_trained_3x3_game() -> None:
             v = DigitParty.calc_score(state)
             training_data.append((state, DQNOutput(policy=pi, value=v)))
 
-    nn.train(training_data)
-    nn.save("simple_q_data.weights.h5")
+    # choose arbitrary number of epochs to train on?
+    while epoch <= opt_nn_params.epochs:
+        try:
+            nn.train(training_data)
+            nn.save(f"simple_q_data_{epoch:04d}_epochs.weights.h5")
+            epoch += 1
+        except Exception as e:
+            print("ran into exception while training:\n", e)
+            print(f"retrying epoch {epoch}")
 
     deep_play_digit_party(100, 3, nn)
 
@@ -500,10 +528,10 @@ def deep_play_digit_party(games: int, n: int, nn: NeuralNetwork) -> None:
 def main() -> None:
     # bayesian_optimization()
     # chunk_trained_3x3_game()
-    # full_trained_3x3_game()
+    full_trained_3x3_game()
 
-    cur_dir = pathlib.Path(__file__).parent.resolve()
-    model_folder = f"{cur_dir}/experimental3x3_models/"
-    nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
-    nn.load("simple_q_data_incremental_0999.weights.h5")
-    deep_play_digit_party(games=10000, n=3, nn=nn)
+    # cur_dir = pathlib.Path(__file__).parent.resolve()
+    # model_folder = f"{cur_dir}/experimental3x3_models/"
+    # nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
+    # nn.load("simple_q_data_incremental_0999.weights.h5")
+    # deep_play_digit_party(games=10000, n=3, nn=nn)
