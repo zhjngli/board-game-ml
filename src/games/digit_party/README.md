@@ -10,7 +10,7 @@ For the 3x3 game, this works reasonably well. For a totally untrained agent (pla
 
 ![an untrained agent playing 100,000 3x3 games follows a normal distribution around 50% score](./results/q-3x3-untrained.png "untrained 3x3 agent: games played per percent score")
 
-After training the simple q-agent on about 20,000,000 games, here is the resulting distribution:
+After training the simple q-agent on about 20,000,000 games, here is the resulting distribution playing 100,000 games:
 
 ![a trained agent playing 100,000 3x3 games averages 90% and gets 100% more than 35% of the time](./results/q-3x3.png "trained 3x3 agent: games played per percent score")
 
@@ -40,9 +40,9 @@ For one agent, I took the training data from each of the 1000 chunks, and traine
 
 ![a deep network trained on the chunks of training data, playing 10,000 3x3 games averages 70% score](./results/deep-3x3-1000-inc-10k-games.png "deep trained 3x3 agent: games played per percent score")
 
-For another agent, I trained it with the whole set of training data (all 1000 chunks). (However, I only ran it through 10 epochs, though the hyperparameters I found recommended 42 epochs. Training locally isn't very resilient, so there's possibility of it glitching out during training, without saving the neural network weights.) Here's the result of that agent playing 10,000 games:
+For another agent, I trained it with the whole set of training data (all 1000 chunks). (However, I ran it through the recommended 42 epochs incrementally, by saving the network after 1 epoch for 42 iterations. Training locally isn't very resilient, so there's possibility of it glitching out during training, without saving the neural network weights.) Here's the result of that agent playing 10,000 games:
 
-![a deep network trained on the full set of training data, playing 10,000 3x3 games averages 70% score](./results/deep-3x3-full-trained-10-epochs-10k-games.png "deep trained 3x3 agent: games played per percent score")
+![a deep network trained on the full set of training data, playing 10,000 3x3 games averages 70% score](./results/deep-3x3-full-trained-42-epochs-10k-games.png "deep trained 3x3 agent: games played per percent score")
 
 Both agents clearly do better (averaging 70% score) than a totally untrained agent (which averages 50% score), though it still fails to live up to the agent trained with the simple q-learning method.
 

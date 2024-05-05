@@ -528,10 +528,10 @@ def deep_play_digit_party(games: int, n: int, nn: NeuralNetwork) -> None:
 def main() -> None:
     # bayesian_optimization()
     # chunk_trained_3x3_game()
-    full_trained_3x3_game()
+    # full_trained_3x3_game()
 
-    # cur_dir = pathlib.Path(__file__).parent.resolve()
-    # model_folder = f"{cur_dir}/experimental3x3_models/"
-    # nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
-    # nn.load("simple_q_data_incremental_0999.weights.h5")
-    # deep_play_digit_party(games=10000, n=3, nn=nn)
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    model_folder = f"{cur_dir}/experimental3x3_models/"
+    nn = DigitParty3x3NeuralNetwork(params=opt_nn_params, model_folder=model_folder)
+    nn.load("simple_q_data_0042_epochs.weights.h5")
+    deep_play_digit_party(games=10000, n=3, nn=nn)
