@@ -40,9 +40,9 @@ For one agent, I took the training data from each of the 1000 chunks, and traine
 
 ![a deep network trained on the chunks of training data, playing 10,000 3x3 games averages 70% score](./results/deep-3x3-1000-inc-10k-games.png "deep trained 3x3 agent: games played per percent score")
 
-For another agent, I trained it with the whole set of training data (all 1000 chunks). (However, I ran it through the recommended 42 epochs incrementally, by saving the network after 1 epoch for 42 iterations. Training locally isn't very resilient, so there's possibility of it glitching out during training, without saving the neural network weights.) Here's the result of that agent playing 10,000 games:
+For another agent, I trained it with the whole set of training data (all 1000 chunks). (However, I ran it through 200 epochs incrementally, by saving the network after 1 epoch for 200 iterations. Training locally isn't very resilient, so there's possibility of it glitching out during training, without saving the neural network weights. I also found that 200 epochs wasn't much better than running it through the recommended 42 epochs.) Here's the result of that agent playing 10,000 games:
 
-![a deep network trained on the full set of training data, playing 10,000 3x3 games averages 70% score](./results/deep-3x3-full-trained-42-epochs-10k-games.png "deep trained 3x3 agent: games played per percent score")
+![a deep network trained on the full set of training data, playing 10,000 3x3 games averages 70% score](./results/deep-3x3-full-trained-200-epochs-10k-games.png "deep trained 3x3 agent: games played per percent score")
 
 Both agents clearly do better (averaging 70% score) than a totally untrained agent (which averages 50% score), though it still fails to live up to the agent trained with the simple q-learning method.
 
