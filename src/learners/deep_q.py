@@ -145,10 +145,10 @@ class DeepQLearner(Generic[State, Immutable]):
             self.memory.append(mem)
 
             # replay memory
-            if self.steps % self.steps_to_train_shortterm == 0:
+            if self.steps_to_train_shortterm > 0 and self.steps % self.steps_to_train_shortterm == 0:
                 self.replay_memory(np.array([mem]))
 
-            if (
+            if (self.steps_to_train_longterm > 0 and
                 self.steps % self.steps_to_train_longterm == 0
                 and len(self.memory) > self.minibatch_size
                 and len(self.memory) > self.min_replay_size
@@ -187,7 +187,13 @@ class DeepQLearner(Generic[State, Immutable]):
             ] + self.alpha * max_next_qs[i]
 
         # TODO: make train type signature flexible so i don't have to convert to list?
-        self.predict_nn.train(list(zip(states, dqn_outs)))
+        successful_train = False
+        while not successful_train:
+            try:
+                self.predict_nn.train(list(zip(states, dqn_outs)))
+                successful_train = True
+            except Exception as e:
+                print(f"Failed to train with error {e}, retrying...")
 
     def load_latest_model(self) -> int:
         """
@@ -211,6 +217,7 @@ class DeepQLearner(Generic[State, Immutable]):
                     latest_model = f
 
         if latest_model:
+            print(f"Loading latest model from: {latest_model}")
             self.predict_nn.load(latest_model)
             self.target_nn.load(latest_model)
         return latest
@@ -243,5 +250,6 @@ class DeepQLearner(Generic[State, Immutable]):
                     latest_memory = f
 
         if latest_memory:
+            print(f"Loading replay memory from: {latest_memory}")
             with open(latest_memory, "rb") as file:
                 self.memory = pickle.load(file)
