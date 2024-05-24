@@ -634,17 +634,19 @@ mcts_params = MCTSParameters(
 def alpha_zero_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     a0 = AlphaZero(
-        TicTacToe(),
-        TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"),
-        TTTNeuralNetwork(params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"),
+        TicTacToe,
+        lambda: TTTNeuralNetwork(
+            params=opt_nn_params, model_folder=f"{cur_dir}/a0_nn_models/"
+        ),
         A0Parameters(
             temp_threshold=1,
-            pit_games=100,
+            pit_games=20,
             pit_threshold=0.55,
-            training_episodes=100,
-            training_games_per_episode=100,
+            training_episodes=102,
+            training_games_per_episode=10,
             training_queue_length=10000,
             training_hist_max_len=20,
+            thread_max_workers=8,
         ),
         training_mcts_params,
         training_examples_folder=f"{cur_dir}/a0_training_examples/",

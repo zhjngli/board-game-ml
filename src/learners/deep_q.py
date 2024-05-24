@@ -145,11 +145,15 @@ class DeepQLearner(Generic[State, Immutable]):
             self.memory.append(mem)
 
             # replay memory
-            if self.steps_to_train_shortterm > 0 and self.steps % self.steps_to_train_shortterm == 0:
+            if (
+                self.steps_to_train_shortterm > 0
+                and self.steps % self.steps_to_train_shortterm == 0
+            ):
                 self.replay_memory(np.array([mem]))
 
-            if (self.steps_to_train_longterm > 0 and
-                self.steps % self.steps_to_train_longterm == 0
+            if (
+                self.steps_to_train_longterm > 0
+                and self.steps % self.steps_to_train_longterm == 0
                 and len(self.memory) > self.minibatch_size
                 and len(self.memory) > self.min_replay_size
             ):

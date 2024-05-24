@@ -322,20 +322,20 @@ class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
 def alpha_zero_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     a0 = AlphaZero(
-        UltimateTicTacToe(),
-        UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
-        UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
+        UltimateTicTacToe,
+        lambda: UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/"),
         A0Parameters(
             temp_threshold=11,
             pit_games=20,
             pit_threshold=0.55,
             training_episodes=200,
-            training_games_per_episode=10,
-            training_queue_length=10000,
+            training_games_per_episode=50,
+            training_queue_length=50000,  # at most 50 (num games) * 81 (max num moves) * 8 symmetries
             training_hist_max_len=50,
+            thread_max_workers=8,  # 8 cores on m1 chip
         ),
         MCTSParameters(
-            num_searches=100,
+            num_searches=1000,
             cpuct=1,
             epsilon=1e-4,
         ),
@@ -345,7 +345,7 @@ def alpha_zero_trained_game():
 
     g = UltimateTicTacToe()
     params = MCTSParameters(
-        num_searches=100,
+        num_searches=1000,
         cpuct=1,
         epsilon=1e-4,
     )
@@ -411,6 +411,15 @@ def vs_alpha_zero_game():
 
 
 def main() -> None:
+    # cur_dir = pathlib.Path(__file__).parent.resolve()
+    # with open(f"{cur_dir}/a0_training_examples/training_examples_0000000.pkl", "rb") as file:
+    #     training_history = pickle.load(file)
+    # print(f"length of history: {len(training_history)}")
+    # l = 0
+    # for dq in training_history:
+    #     l += len(dq)
+    # print(f"length of all moves: {l}")
+
     # monte_carlo_trained_game(training_episodes=1)
     alpha_zero_trained_game()
     vs_alpha_zero_game()

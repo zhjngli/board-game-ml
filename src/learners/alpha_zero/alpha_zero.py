@@ -2,6 +2,7 @@ import os
 import pickle
 from abc import ABC
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Deque, Generic, List, NamedTuple, Optional, Tuple
 
 import numpy as np
@@ -23,6 +24,7 @@ class A0Parameters(NamedTuple):
     training_games_per_episode: int
     training_queue_length: int
     training_hist_max_len: int
+    thread_max_workers: int
 
 
 class AlphaZero(ABC, Generic[State, Immutable]):
@@ -32,17 +34,17 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
     def __init__(
         self,
-        game: Game[State, Immutable],
-        nn: NeuralNetwork[A0NNInput, A0NNOutput],
-        pn: NeuralNetwork[A0NNInput, A0NNOutput],
+        create_game: Callable[[], Game[State, Immutable]],
+        create_nn: Callable[[], NeuralNetwork[A0NNInput, A0NNOutput]],
         params: A0Parameters,
         m_params: MCTSParameters,
         training_examples_folder: str,
     ) -> None:
-        self.game = game
-        self.nn = nn  # current neural network
-        self.pn = pn  # previous neural network for self-play
-        self.m = MonteCarloTreeSearch(self.game, self.nn, m_params)
+        self.create_game = create_game
+        self.create_nn = create_nn
+        self.nn = create_nn()  # current neural network
+        self.pn = create_nn()  # previous neural network for self-play
+        # self.m = MonteCarloTreeSearch(self.create_game(), self.nn, m_params)
         self.training_history: List[Deque[Tuple[A0NNInput, A0NNOutput]]] = []
         self.training_examples_folder = training_examples_folder
 
@@ -55,32 +57,38 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self.training_games_per_episode = params.training_games_per_episode
         self.training_queue_length = params.training_queue_length
         self.training_hist_max_len = params.training_hist_max_len
+        self.thread_max_workers = params.thread_max_workers
 
     def train_once(self) -> List[Tuple[A0NNInput, A0NNOutput]]:
-        self.game.reset()
+        game = self.create_game()
+        game.reset()
+
+        nn = self.create_nn()
+        nn.set_weights(self.nn.get_weights())
+        m = MonteCarloTreeSearch(self.create_game(), nn, self.m_params)
 
         training_data: List[Tuple[Board, Player, Policy, Optional[Value]]] = []
-        state = self.game.state()
+        state = game.state()
         player = state.player
 
         turn = 0
-        while not self.game.check_finished(state):
+        while not game.check_finished(state):
             turn += 1
-            oriented_state = self.game.orient_state(state)
+            oriented_state = game.orient_state(state)
             temperature = 1 if turn < self.temperature_threshold else 0
-            pi = self.m.action_probabilities(oriented_state, temperature)
-            bs = self.game.symmetries_of(oriented_state.board)
-            pis = self.game.symmetries_of(np.asarray(pi))
+            pi = m.action_probabilities(oriented_state, temperature)
+            bs = game.symmetries_of(oriented_state.board)
+            pis = game.symmetries_of(np.asarray(pi))
 
             for b, p in zip(bs, pis):
                 training_data.append((b, player, p, None))
 
             action = np.random.choice(len(pi), p=pi)
 
-            state = self.game.apply(state, action)
+            state = game.apply(state, action)
             player = state.player
 
-        reward = self.game.calculate_reward(state)
+        reward = game.calculate_reward(state)
         return [
             (
                 A0NNInput(board=x[0]),
@@ -98,9 +106,13 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             self_play_data: Deque[Tuple[A0NNInput, A0NNOutput]] = deque(
                 [], maxlen=self.training_queue_length
             )
-            for _ in range(self.training_games_per_episode):
-                self.m = MonteCarloTreeSearch(self.game, self.nn, self.m_params)
-                self_play_data.extend(self.train_once())
+            with ThreadPoolExecutor(max_workers=self.thread_max_workers) as executor:
+                futures = [
+                    executor.submit(self.train_once)
+                    for _ in range(self.training_games_per_episode)
+                ]
+                for future in futures:
+                    self_play_data.extend(future.result())
 
             self.training_history.append(self_play_data)
 
@@ -117,8 +129,14 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             training_data = [
                 d for game_data in self.training_history for d in game_data
             ]
-            # shuffle(training_data)  # can shuffle in nn.train()
-            self.nn.train(training_data)
+            successful_train = False
+            while not successful_train:
+                try:
+                    # shuffle(training_data)  # can shuffle in nn.train()
+                    self.nn.train(training_data)
+                    successful_train = True
+                except Exception as e:
+                    print(f"Failed to train with error {e}, retrying...")
 
             # if model is good enough, keep it
             if self.pit():
@@ -128,8 +146,8 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 self.nn.load("temp_model.weights.h5")
 
     def pit(self) -> bool:
-        prev_mtcs = MonteCarloTreeSearch(self.game, self.pn, self.m_params)
-        candidate = MonteCarloTreeSearch(self.game, self.nn, self.m_params)
+        prev_mtcs = MonteCarloTreeSearch(self.create_game(), self.pn, self.m_params)
+        candidate = MonteCarloTreeSearch(self.create_game(), self.nn, self.m_params)
         play1: Callable[[State], Action] = lambda s: int(
             np.argmax(prev_mtcs.action_probabilities(s, temperature=0))
         )
@@ -150,18 +168,19 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 play1, play2 = play2, play1
                 p1wins, p2wins = p2wins, p1wins
 
-            self.game.reset()
-            state = self.game.state()
+            game = self.create_game()
+            game.reset()
+            state = game.state()
             player = state.player
 
-            while not self.game.check_finished(state):
+            while not game.check_finished(state):
                 # oriented_state = self.game.oriented_state(state)  # only needed for nn prediction
                 play = play1 if player == P1 else play2
                 a = play(state)
-                state = self.game.apply(state, a)
+                state = game.apply(state, a)
                 player = state.player
 
-            r = self.game.calculate_reward(state)
+            r = game.calculate_reward(state)
             if r == P1WIN:
                 p1wins += 1
             elif r == P2WIN:
