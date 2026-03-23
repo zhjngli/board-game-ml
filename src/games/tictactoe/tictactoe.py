@@ -193,17 +193,24 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
         return list(b.reshape(TicTacToe.num_actions()))
 
     @staticmethod
-    def symmetries_of(a: NDArray) -> List[NDArray]:
-        syms: List[NDArray] = []
-        input_shape = a.shape
-        b = np.copy(a)
-        b = b.reshape((3, 3))
+    def to_nn_input(state: TicTacToeState) -> NDArray:
+        return state.board
+
+    @staticmethod
+    def training_symmetries(
+        nn_input: NDArray, policy: NDArray
+    ) -> List[Tuple[NDArray, NDArray]]:
+        syms: List[Tuple[NDArray, NDArray]] = []
+        board = nn_input.reshape((3, 3))
+        pol = policy.reshape((3, 3))
         for i in range(1, 5):
             for mirror in [True, False]:
-                s = np.rot90(b, i)
+                b = np.rot90(board, i)
+                p = np.rot90(pol, i)
                 if mirror:
-                    s = np.fliplr(s)
-                syms.append(s.reshape(input_shape))
+                    b = np.fliplr(b)
+                    p = np.fliplr(p)
+                syms.append((b.reshape(nn_input.shape), p.reshape(policy.shape)))
         return syms
 
     @staticmethod
