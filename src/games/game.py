@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Generic, List, Literal, TypeVar
+from typing import Generic, List, Literal, Tuple, TypeVar
 
 from numpy.typing import NDArray
 
 Board = NDArray
+NNInput = TypeVar("NNInput")
 Player = Literal[1, -1]
 P1: Player = 1
 P2: Player = -1
@@ -114,8 +115,20 @@ class Game(ABC, Generic[State, Immutable]):
 
     @staticmethod
     @abstractmethod
-    def symmetries_of(a: NDArray) -> List[NDArray]:
+    def to_nn_input(state: State) -> NDArray:
         """
-        List the symmetries of the given board or policy.
+        Convert a game state to the NN input tensor.
+        Each game defines what the NN sees (e.g., board only, board + active_nonant mask).
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def training_symmetries(
+        nn_input: NDArray, policy: NDArray
+    ) -> List[Tuple[NDArray, NDArray]]:
+        """
+        Return paired (nn_input, policy) symmetries for training data augmentation.
+        MUST include the identity (un-transformed) pair.
         """
         pass
