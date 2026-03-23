@@ -1,6 +1,6 @@
 import numpy as np
 
-from games.game import P1, P2
+from games.game import P1
 from games.tictactoe.tictactoe import TicTacToe, TicTacToeState
 
 
