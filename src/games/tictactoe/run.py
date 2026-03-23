@@ -457,11 +457,11 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         )
         self.model.summary()
 
-    def train(self, data: List[Tuple[A0NNInput, A0NNOutput]]) -> None:
-        inputs: List[A0NNInput]
-        outputs: List[A0NNOutput]
+    def train(self, data):
         inputs, outputs = list(zip(*data))
-        input_boards = np.asarray([input.board for input in inputs])
+        input_boards = np.asarray(
+            [i if isinstance(i, np.ndarray) else i.board for i in inputs]
+        )
         target_pis = np.asarray([output.policy for output in outputs])
         target_vs = np.asarray([output.value for output in outputs])
         self.model.fit(
@@ -472,8 +472,10 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
             shuffle=True,
         )
 
-    def predict(self, inputs: List[A0NNInput]) -> List[A0NNOutput]:
-        boards = np.asarray([i.board for i in inputs])
+    def predict(self, inputs):
+        boards = np.asarray(
+            [i if isinstance(i, np.ndarray) else i.board for i in inputs]
+        )
         pis, vs = self.model.predict(boards, verbose=0)
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
@@ -647,8 +649,9 @@ def alpha_zero_trained_game():
             training_queue_length=10000,
             training_hist_max_len=20,
             thread_max_workers=8,
+            training_mcts_params=training_mcts_params,
+            eval_mcts_params=mcts_params,
         ),
-        training_mcts_params,
         training_examples_folder=f"{cur_dir}/a0_training_examples/",
     )
     a0.train()
