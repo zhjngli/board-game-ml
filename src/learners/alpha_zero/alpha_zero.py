@@ -101,9 +101,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         for i in range(last_ep + 1, self.training_episodes):
             # self play
-            self_play_data: Deque[Tuple] = deque(
-                [], maxlen=self.training_queue_length
-            )
+            self_play_data: Deque[Tuple] = deque([], maxlen=self.training_queue_length)
             with ThreadPoolExecutor(max_workers=self.thread_max_workers) as executor:
                 futures = [
                     executor.submit(self.train_once)
@@ -144,8 +142,12 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 self.nn.load("temp_model.weights.h5")
 
     def pit(self) -> bool:
-        prev_mtcs = MonteCarloTreeSearch(self.create_game(), self.pn, self.eval_mcts_params)
-        candidate = MonteCarloTreeSearch(self.create_game(), self.nn, self.eval_mcts_params)
+        prev_mtcs = MonteCarloTreeSearch(
+            self.create_game(), self.pn, self.eval_mcts_params
+        )
+        candidate = MonteCarloTreeSearch(
+            self.create_game(), self.nn, self.eval_mcts_params
+        )
         play1: Callable[[State], Action] = lambda s: int(
             np.argmax(prev_mtcs.action_probabilities(s, temperature=0))
         )

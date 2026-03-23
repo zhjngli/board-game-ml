@@ -11,7 +11,6 @@ from keras.layers import (  # type: ignore
     Dropout,
     Flatten,
     Input,
-    Reshape,
 )
 from keras.models import Model  # type: ignore
 from keras.optimizers import Adam  # type: ignore
@@ -25,12 +24,7 @@ from games.ultimate_ttt.ultimate import (
     UltimateTicTacToe,
     ir_to_state,
 )
-from learners.alpha_zero.alpha_zero import (
-    A0NNInput,
-    A0NNOutput,
-    A0Parameters,
-    AlphaZero,
-)
+from learners.alpha_zero.alpha_zero import A0NNOutput, A0Parameters, AlphaZero
 from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
@@ -196,82 +190,43 @@ def monte_carlo_trained_game():
     print("\ngame over!")
 
 
-class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
-    NUM_FILTERS = 3  # one for each -1, 0, 1
-    DROPOUT_RATE = 0.3
-    LEARN_RATE = 0.01
-    BATCH_SIZE = 64
-    EPOCHS = 10
+class UltimateNeuralNetwork(NeuralNetwork):
+    NUM_FILTERS = 64
+    NUM_CONV_LAYERS = 4
+    DROPOUT_RATE = 0.05
+    LEARN_RATE = 0.001
+    BATCH_SIZE = 128
+    EPOCHS = 30
 
     def __init__(self, model_folder: str) -> None:
         super().__init__(model_folder)
 
-        # no 4d conv layer so reshape input to 9x9
-        input = Input(
-            shape=(3, 3, 3, 3), name="UltimateBoardInput"
-        )  # TODO: batch size? defaults to None I think.
-        # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
-        board = Reshape((9, 9, 1))(input)
-        # normalize along channels axis
-        conv1 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(3, 3), padding="same")(
-                    board
+        input = Input(shape=(9, 9, 2), name="UltimateBoardInput")
+        prev = input
+
+        for _ in range(self.NUM_CONV_LAYERS):
+            prev = Activation("relu")(
+                BatchNormalization(axis=3)(
+                    Conv2D(
+                        filters=self.NUM_FILTERS,
+                        kernel_size=(3, 3),
+                        padding="same",
+                    )(prev)
                 )
             )
-        )
-        conv2 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(3, 3), padding="same")(
-                    conv1
-                )
-            )
-        )
-        conv3 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(3, 3), padding="same")(
-                    conv2
-                )
-            )
-        )
-        conv4 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(3, 3), padding="same")(
-                    conv3
-                )
-            )
-        )
-        conv5 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(3, 3), padding="same")(
-                    conv4
-                )
-            )
-        )
-        conv6 = Activation("relu")(
-            BatchNormalization(axis=3)(
-                Conv2D(filters=self.NUM_FILTERS, kernel_size=(3, 3), padding="same")(
-                    conv5
-                )
-            )
-        )
-        flat = Flatten()(conv6)
+
+        flat = Flatten()(prev)
         dense1 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(2048)(flat)))
+            Activation("relu")(BatchNormalization(axis=1)(Dense(512)(flat)))
         )
         dense2 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(1024)(dense1)))
-        )
-        dense3 = Dropout(rate=self.DROPOUT_RATE)(
-            Activation("relu")(BatchNormalization(axis=1)(Dense(512)(dense2)))
+            Activation("relu")(BatchNormalization(axis=1)(Dense(256)(dense1)))
         )
 
-        # policy, guessing the value of each valid action at the input state
         pi = Dense(UltimateTicTacToe.num_actions(), activation="softmax", name="pi")(
-            dense3
+            dense2
         )
-        # value, guessing the value of the input state
-        v = Dense(1, activation="tanh", name="v")(dense3)
+        v = Dense(1, activation="tanh", name="v")(dense2)
 
         self.model = Model(inputs=input, outputs=[pi, v])
         self.model.compile(
@@ -281,24 +236,22 @@ class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         )
         self.model.summary()
 
-    def train(self, data: List[Tuple[A0NNInput, A0NNOutput]]) -> None:
-        inputs: List[A0NNInput]
-        outputs: List[A0NNOutput]
+    def train(self, data):
         inputs, outputs = list(zip(*data))
-        input_boards = np.asarray([input.board for input in inputs])
+        input_tensors = np.asarray(list(inputs))
         target_pis = np.asarray([output.policy for output in outputs])
         target_vs = np.asarray([output.value for output in outputs])
         self.model.fit(
-            x=input_boards,
+            x=input_tensors,
             y=[target_pis, target_vs],
             batch_size=self.BATCH_SIZE,
             epochs=self.EPOCHS,
             shuffle=True,
         )
 
-    def predict(self, inputs: List[A0NNInput]) -> List[A0NNOutput]:
-        boards = np.asarray([i.board for i in inputs])
-        pis, vs = self.model.predict(boards, verbose=0)
+    def predict(self, inputs):
+        tensors = np.asarray(list(inputs))
+        pis, vs = self.model.predict(tensors, verbose=0)
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
     def save(self, file: str) -> None:
@@ -319,6 +272,23 @@ class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         return self.model.get_weights()
 
 
+training_mcts_params = MCTSParameters(
+    num_searches=200,
+    cpuct=1,
+    epsilon=1e-4,
+    dirichlet_alpha=0.3,
+    dirichlet_epsilon=0.25,
+)
+
+eval_mcts_params = MCTSParameters(
+    num_searches=1000,
+    cpuct=1,
+    epsilon=1e-4,
+    dirichlet_alpha=0,
+    dirichlet_epsilon=0,
+)
+
+
 def alpha_zero_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     a0 = AlphaZero(
@@ -329,29 +299,21 @@ def alpha_zero_trained_game():
             pit_games=20,
             pit_threshold=0.55,
             training_episodes=200,
-            training_games_per_episode=50,
-            training_queue_length=50000,  # at most 50 (num games) * 81 (max num moves) * 8 symmetries
-            training_hist_max_len=50,
-            thread_max_workers=8,  # 8 cores on m1 chip
-        ),
-        MCTSParameters(
-            num_searches=1000,
-            cpuct=1,
-            epsilon=1e-4,
+            training_games_per_episode=25,
+            training_queue_length=25000,
+            training_hist_max_len=20,
+            thread_max_workers=4,
+            training_mcts_params=training_mcts_params,
+            eval_mcts_params=eval_mcts_params,
         ),
         training_examples_folder=f"{cur_dir}/a0_training_examples/",
     )
     a0.train()
 
     g = UltimateTicTacToe()
-    params = MCTSParameters(
-        num_searches=1000,
-        cpuct=1,
-        epsilon=1e-4,
-    )
     nn = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
     nn.load("best_model.weights.h5")
-    mcts = MonteCarloTreeSearch(g, nn, params)
+    mcts = MonteCarloTreeSearch(g, nn, eval_mcts_params)
 
     def play(s: State) -> Action:
         return int(np.argmax(mcts.action_probabilities(s, temperature=0)))
@@ -375,15 +337,10 @@ def alpha_zero_trained_game():
 
 def vs_alpha_zero_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
-    params = MCTSParameters(
-        num_searches=1000,
-        cpuct=1,
-        epsilon=1e-4,
-    )
     g = UltimateTicTacToe()
     nn = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
     nn.load("best_model.h5")
-    mcts = MonteCarloTreeSearch(g, nn, params)
+    mcts = MonteCarloTreeSearch(g, nn, eval_mcts_params)
 
     def nn_play(s: State) -> Action:
         return int(np.argmax(mcts.action_probabilities(s, temperature=0)))
@@ -411,18 +368,5 @@ def vs_alpha_zero_game():
 
 
 def main() -> None:
-    # import pickle
-    # cur_dir = pathlib.Path(__file__).parent.resolve()
-    # with open(f"{cur_dir}/a0_training_examples/training_examples_0000002.pkl", "rb") as file:
-    #     training_history = pickle.load(file)
-    # print(f"length of history: {len(training_history)}")
-    # l = 0
-    # for i in range(len(training_history)):
-    #     dq = training_history[i]
-    #     print(f"length of hist at {i}: {len(dq)}")
-    #     l += len(dq)
-    # print(f"length of all moves: {l}")
-
-    # monte_carlo_trained_game(training_episodes=1)
     alpha_zero_trained_game()
     vs_alpha_zero_game()
