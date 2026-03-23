@@ -346,16 +346,14 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         return self.n * self.n
 
     @staticmethod
-    def symmetries_of(a: NDArray) -> List[NDArray]:
-        syms: List[NDArray] = []
-        b = np.copy(a)
-        for i in range(1, 5):
-            for mirror in [True, False]:
-                s = np.rot90(b, i)
-                if mirror:
-                    s = np.fliplr(s)
-                syms += s
-        return syms
+    def to_nn_input(state: DigitPartyState) -> NDArray:
+        return state.board
+
+    @staticmethod
+    def training_symmetries(
+        nn_input: NDArray, policy: NDArray
+    ) -> List[Tuple[NDArray, NDArray]]:
+        return [(nn_input, policy)]
 
     @staticmethod
     def calculate_reward(state: DigitPartyState) -> float:
