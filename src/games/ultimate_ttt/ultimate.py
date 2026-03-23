@@ -396,23 +396,6 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         return list(actions.reshape(UltimateTicTacToe.num_actions()))
 
     @staticmethod
-    def symmetries_of(b: NDArray) -> List[NDArray]:
-        # TODO: test this?
-        # TODO: is reshaping multiple times slow? can optimize by having a separate symmetries function specifically for policy vectors
-        syms: List[NDArray] = []
-        input_shape = b.shape
-        b = b.reshape((3, 3, 3, 3))
-        for i in range(1, 5):
-            for mirror in [True, False]:
-                s = np.rot90(np.rot90(b, i), i, (2, 3))
-                if mirror:
-                    # only flip along axis 1 and 3, essentially flipping each individual ttt board and the whole board
-                    # don't need to flip the other 2 axes since those are covered by rotation and flip
-                    s = np.flip(np.flip(s, axis=1), axis=3)
-                syms.append(s.reshape(input_shape))
-        return syms
-
-    @staticmethod
     def to_immutable(state: UltimateState) -> UltimateIR:
         return UltimateIR(
             board=UltimateTicTacToe.get_board_rep(state.board),
@@ -429,13 +412,41 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         )
 
     @staticmethod
+    def to_nn_input(state: UltimateState) -> NDArray:
+        board_plane = state.board.transpose(0, 2, 1, 3).reshape(9, 9)
+        nonant_mask = np.zeros((9, 9))
+        if state.active_nonant is not None:
+            R, C = state.active_nonant
+            nonant_mask[R * 3 : (R + 1) * 3, C * 3 : (C + 1) * 3] = 1
+        else:
+            nonant_mask[:] = 1
+        return np.stack([board_plane, nonant_mask], axis=-1)
+
+    @staticmethod
+    def training_symmetries(
+        nn_input: NDArray, policy: NDArray
+    ) -> List[Tuple[NDArray, NDArray]]:
+        syms: List[Tuple[NDArray, NDArray]] = []
+        pol = policy.reshape((3, 3, 3, 3))
+        for i in range(1, 5):
+            for mirror in [True, False]:
+                # Rotate (9,9,2) input on spatial axes — both channels rotate together
+                inp = np.rot90(nn_input, i, axes=(0, 1))
+                # Rotate policy in (3,3,3,3) space — inner and outer boards
+                p = np.rot90(np.rot90(pol, i), i, (2, 3))
+                if mirror:
+                    inp = np.flip(inp, axis=1)
+                    p = np.flip(np.flip(p, axis=1), axis=3)
+                syms.append((inp, p.reshape(policy.shape)))
+        return syms
+
+    @staticmethod
     def calculate_reward(state: UltimateState) -> float:
         if UltimateTicTacToe._is_win(P1, state.board):
             return P1WIN
         elif UltimateTicTacToe._is_win(P2, state.board):
             return P2WIN
         elif UltimateTicTacToe._is_board_filled(state.board):
-            # TODO: if board is filled, check who won more squares?
-            return 0.1  # TODO: different value for draws?
+            return 0
         else:
             raise RuntimeError(f"Calling reward function when game not ended: {state}")
