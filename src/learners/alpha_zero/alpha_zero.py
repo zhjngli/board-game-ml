@@ -6,13 +6,14 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Deque, Generic, List, NamedTuple, Optional, Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 
-from games.game import P1, P1WIN, P2WIN, Action, Board, Game, Immutable, Player, State
+from games.game import P1, P1WIN, P2WIN, Action, Game, Immutable, Player, State
 from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
 )
-from learners.alpha_zero.types import A0NNInput, A0NNOutput, Policy, Value
+from learners.alpha_zero.types import A0NNOutput
 from nn.neural_network import NeuralNetwork
 
 
@@ -25,6 +26,8 @@ class A0Parameters(NamedTuple):
     training_queue_length: int
     training_hist_max_len: int
     thread_max_workers: int
+    training_mcts_params: MCTSParameters
+    eval_mcts_params: MCTSParameters
 
 
 class AlphaZero(ABC, Generic[State, Immutable]):
@@ -35,20 +38,19 @@ class AlphaZero(ABC, Generic[State, Immutable]):
     def __init__(
         self,
         create_game: Callable[[], Game[State, Immutable]],
-        create_nn: Callable[[], NeuralNetwork[A0NNInput, A0NNOutput]],
+        create_nn: Callable[[], NeuralNetwork],
         params: A0Parameters,
-        m_params: MCTSParameters,
         training_examples_folder: str,
     ) -> None:
         self.create_game = create_game
         self.create_nn = create_nn
         self.nn = create_nn()  # current neural network
         self.pn = create_nn()  # previous neural network for self-play
-        # self.m = MonteCarloTreeSearch(self.create_game(), self.nn, m_params)
-        self.training_history: List[Deque[Tuple[A0NNInput, A0NNOutput]]] = []
+        self.training_history: List[Deque[Tuple]] = []
         self.training_examples_folder = training_examples_folder
 
-        self.m_params = m_params
+        self.training_mcts_params = params.training_mcts_params
+        self.eval_mcts_params = params.eval_mcts_params
 
         self.temperature_threshold = params.temp_threshold
         self.pit_games = params.pit_games
@@ -59,15 +61,15 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self.training_hist_max_len = params.training_hist_max_len
         self.thread_max_workers = params.thread_max_workers
 
-    def train_once(self) -> List[Tuple[A0NNInput, A0NNOutput]]:
+    def train_once(self) -> List[Tuple]:
         game = self.create_game()
         game.reset()
 
         nn = self.create_nn()
         nn.set_weights(self.nn.get_weights())
-        m = MonteCarloTreeSearch(self.create_game(), nn, self.m_params)
+        m = MonteCarloTreeSearch(self.create_game(), nn, self.training_mcts_params)
 
-        training_data: List[Tuple[Board, Player, Policy, Optional[Value]]] = []
+        training_data: List[Tuple[NDArray, Player, NDArray, Optional[float]]] = []
         state = game.state()
         player = state.player
 
@@ -77,23 +79,19 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             oriented_state = game.orient_state(state)
             temperature = 1 if turn < self.temperature_threshold else 0
             pi = m.action_probabilities(oriented_state, temperature)
-            bs = game.symmetries_of(oriented_state.board)
-            pis = game.symmetries_of(np.asarray(pi))
 
-            for b, p in zip(bs, pis):
-                training_data.append((b, player, p, None))
+            nn_input = game.to_nn_input(oriented_state)
+            syms = game.training_symmetries(nn_input, np.asarray(pi))
+            for inp, p in syms:
+                training_data.append((inp, player, p, None))
 
             action = np.random.choice(len(pi), p=pi)
-
             state = game.apply(state, action)
             player = state.player
 
         reward = game.calculate_reward(state)
         return [
-            (
-                A0NNInput(board=x[0]),
-                A0NNOutput(policy=x[2], value=reward * ((-1) ** (x[1] != player))),
-            )
+            (x[0], A0NNOutput(policy=x[2], value=reward * ((-1) ** (x[1] != player))))
             for x in training_data
         ]
 
@@ -103,7 +101,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         for i in range(last_ep + 1, self.training_episodes):
             # self play
-            self_play_data: Deque[Tuple[A0NNInput, A0NNOutput]] = deque(
+            self_play_data: Deque[Tuple] = deque(
                 [], maxlen=self.training_queue_length
             )
             with ThreadPoolExecutor(max_workers=self.thread_max_workers) as executor:
@@ -146,8 +144,8 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 self.nn.load("temp_model.weights.h5")
 
     def pit(self) -> bool:
-        prev_mtcs = MonteCarloTreeSearch(self.create_game(), self.pn, self.m_params)
-        candidate = MonteCarloTreeSearch(self.create_game(), self.nn, self.m_params)
+        prev_mtcs = MonteCarloTreeSearch(self.create_game(), self.pn, self.eval_mcts_params)
+        candidate = MonteCarloTreeSearch(self.create_game(), self.nn, self.eval_mcts_params)
         play1: Callable[[State], Action] = lambda s: int(
             np.argmax(prev_mtcs.action_probabilities(s, temperature=0))
         )
