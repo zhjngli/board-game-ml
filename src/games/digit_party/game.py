@@ -8,7 +8,17 @@ import numpy as np
 from numpy.typing import NDArray
 
 from games.digit_party.data import max_conns
-from games.game import INVAL, P1, VALID, Action, ActionStatus, BasicState, Game, Player
+from games.game import (
+    INVAL,
+    P1,
+    VALID,
+    Action,
+    ActionStatus,
+    BasicState,
+    Game,
+    NNInput,
+    Player,
+)
 
 """
 For more information about this game, see the following links:
@@ -346,14 +356,14 @@ class DigitParty(Game[DigitPartyState, DigitPartyIR]):
         return self.n * self.n
 
     @staticmethod
-    def to_nn_input(state: DigitPartyState) -> NDArray:
+    def to_nn_input(state: DigitPartyState) -> NNInput:
         return state.board
 
     @staticmethod
     def training_symmetries(
-        nn_input: NDArray, policy: NDArray
-    ) -> List[Tuple[NDArray, NDArray]]:
-        syms: List[Tuple[NDArray, NDArray]] = []
+        nn_input: NNInput, policy: NDArray
+    ) -> List[Tuple[NNInput, NDArray]]:
+        syms: List[Tuple[NNInput, NDArray]] = []
         board = nn_input
         pol = policy.reshape(board.shape)
         for i in range(1, 5):

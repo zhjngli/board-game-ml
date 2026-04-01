@@ -14,6 +14,7 @@ from games.game import (
     ActionStatus,
     BasicState,
     Game,
+    NNInput,
     Player,
     switch_player,
 )
@@ -193,14 +194,14 @@ class TicTacToe(Game[TicTacToeState, TicTacToeIR]):
         return list(b.reshape(TicTacToe.num_actions()))
 
     @staticmethod
-    def to_nn_input(state: TicTacToeState) -> NDArray:
+    def to_nn_input(state: TicTacToeState) -> NNInput:
         return state.board
 
     @staticmethod
     def training_symmetries(
-        nn_input: NDArray, policy: NDArray
-    ) -> List[Tuple[NDArray, NDArray]]:
-        syms: List[Tuple[NDArray, NDArray]] = []
+        nn_input: NNInput, policy: NDArray
+    ) -> List[Tuple[NNInput, NDArray]]:
+        syms: List[Tuple[NNInput, NDArray]] = []
         board = nn_input.reshape((3, 3))
         pol = policy.reshape((3, 3))
         for i in range(1, 5):

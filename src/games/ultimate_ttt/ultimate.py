@@ -15,6 +15,7 @@ from games.game import (
     ActionStatus,
     BasicState,
     Game,
+    NNInput,
     Player,
     switch_player,
 )
@@ -412,7 +413,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         )
 
     @staticmethod
-    def to_nn_input(state: UltimateState) -> NDArray:
+    def to_nn_input(state: UltimateState) -> NNInput:
         board_plane = state.board.transpose(0, 2, 1, 3).reshape(9, 9)
         nonant_mask = np.zeros((9, 9))
         if state.active_nonant is not None:
@@ -424,9 +425,9 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
 
     @staticmethod
     def training_symmetries(
-        nn_input: NDArray, policy: NDArray
-    ) -> List[Tuple[NDArray, NDArray]]:
-        syms: List[Tuple[NDArray, NDArray]] = []
+        nn_input: NNInput, policy: NDArray
+    ) -> List[Tuple[NNInput, NDArray]]:
+        syms: List[Tuple[NNInput, NDArray]] = []
         pol = policy.reshape((3, 3, 3, 3))
         for i in range(1, 5):
             for mirror in [True, False]:

@@ -22,7 +22,7 @@ from sklearn.model_selection import train_test_split  # type: ignore
 from tqdm import tqdm
 from typing_extensions import override
 
-from games.game import P1, P2
+from games.game import P1, P2, NNInput
 from games.tictactoe.tictactoe import (
     Empty,
     TicTacToe,
@@ -35,7 +35,7 @@ from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
 )
-from learners.alpha_zero.types import A0NNInput, A0NNOutput
+from learners.alpha_zero.types import A0NNOutput
 from learners.monte_carlo import MonteCarloLearner
 from learners.q import SimpleQLearner
 from learners.trainer import Trainer
@@ -408,7 +408,7 @@ class TTTNNParams(NamedTuple):
     dropout_rate: float
 
 
-class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
+class TTTNeuralNetwork(NeuralNetwork[NNInput, A0NNOutput]):
     def __init__(self, params: TTTNNParams, model_folder: str) -> None:
         super().__init__(model_folder)
         self.params = params
@@ -457,10 +457,10 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
         )
         self.model.summary()
 
-    def train(self, data):
+    def train(self, data: List[Tuple[NNInput, A0NNOutput]]) -> None:
         inputs, outputs = list(zip(*data))
         input_boards = np.asarray(
-            [i if isinstance(i, np.ndarray) else i.board for i in inputs]
+            [i if isinstance(i, np.ndarray) else i.board for i in inputs]  # type: ignore[attr-defined]  # backward compat: old .pkl files store A0NNInput(board=...)
         )
         target_pis = np.asarray([output.policy for output in outputs])
         target_vs = np.asarray([output.value for output in outputs])
@@ -472,9 +472,9 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
             shuffle=True,
         )
 
-    def predict(self, inputs):
+    def predict(self, inputs: List[NNInput]) -> List[A0NNOutput]:
         boards = np.asarray(
-            [i if isinstance(i, np.ndarray) else i.board for i in inputs]
+            [i if isinstance(i, np.ndarray) else i.board for i in inputs]  # type: ignore[attr-defined]  # backward compat: old .pkl files store A0NNInput(board=...)
         )
         pis, vs = self.model.predict(boards, verbose=0)
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]

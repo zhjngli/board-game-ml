@@ -8,7 +8,7 @@ from typing import Callable, Deque, Generic, List, NamedTuple, Optional, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from games.game import P1, P1WIN, P2WIN, Action, Game, Immutable, Player, State
+from games.game import P1, P1WIN, P2WIN, Action, Game, Immutable, NNInput, Player, State
 from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
@@ -46,7 +46,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self.create_nn = create_nn
         self.nn = create_nn()  # current neural network
         self.pn = create_nn()  # previous neural network for self-play
-        self.training_history: List[Deque[Tuple[NDArray, A0NNOutput]]] = []
+        self.training_history: List[Deque[Tuple[NNInput, A0NNOutput]]] = []
         self.training_examples_folder = training_examples_folder
 
         self.training_mcts_params = params.training_mcts_params
@@ -61,7 +61,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self.training_hist_max_len = params.training_hist_max_len
         self.thread_max_workers = params.thread_max_workers
 
-    def train_once(self) -> List[Tuple[NDArray, A0NNOutput]]:
+    def train_once(self) -> List[Tuple[NNInput, A0NNOutput]]:
         game = self.create_game()
         game.reset()
 
@@ -69,7 +69,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         nn.set_weights(self.nn.get_weights())
         m = MonteCarloTreeSearch(self.create_game(), nn, self.training_mcts_params)
 
-        training_data: List[Tuple[NDArray, Player, NDArray, Optional[float]]] = []
+        training_data: List[Tuple[NNInput, Player, NDArray, Optional[float]]] = []
         state = game.state()
         player = state.player
 

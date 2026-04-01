@@ -14,10 +14,9 @@ from keras.layers import (  # type: ignore
 )
 from keras.models import Model  # type: ignore
 from keras.optimizers import Adam  # type: ignore
-from numpy.typing import NDArray
 from typing_extensions import override
 
-from games.game import P1, P2, VALID, Action, State
+from games.game import P1, P2, VALID, Action, NNInput, State
 from games.ultimate_ttt.ultimate import (
     Location,
     Section,
@@ -242,7 +241,7 @@ class UltimateNeuralNetwork(NeuralNetwork):
         )
         self.model.summary()
 
-    def train(self, data: List[Tuple[NDArray, A0NNOutput]]) -> None:
+    def train(self, data: List[Tuple[NNInput, A0NNOutput]]) -> None:
         inputs, outputs = list(zip(*data))
         input_tensors = np.asarray(list(inputs))
         target_pis = np.asarray([output.policy for output in outputs])
@@ -255,7 +254,7 @@ class UltimateNeuralNetwork(NeuralNetwork):
             shuffle=True,
         )
 
-    def predict(self, inputs: List[NDArray]) -> List[A0NNOutput]:
+    def predict(self, inputs: List[NNInput]) -> List[A0NNOutput]:
         tensors = np.asarray(list(inputs))
         pis, vs = self.model.predict(tensors, verbose=0)
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
