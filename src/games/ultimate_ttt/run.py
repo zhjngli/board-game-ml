@@ -386,4 +386,5 @@ def vs_alpha_zero_game():
 
 
 def main() -> None:
+    alpha_zero_train()
     self_play_demo()
