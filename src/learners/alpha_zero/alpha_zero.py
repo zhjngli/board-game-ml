@@ -46,7 +46,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self.create_nn = create_nn
         self.nn = create_nn()  # current neural network
         self.pn = create_nn()  # previous neural network for self-play
-        self.training_history: List[Deque[Tuple]] = []
+        self.training_history: List[Deque[Tuple[NDArray, A0NNOutput]]] = []
         self.training_examples_folder = training_examples_folder
 
         self.training_mcts_params = params.training_mcts_params
@@ -61,7 +61,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self.training_hist_max_len = params.training_hist_max_len
         self.thread_max_workers = params.thread_max_workers
 
-    def train_once(self) -> List[Tuple]:
+    def train_once(self) -> List[Tuple[NDArray, A0NNOutput]]:
         game = self.create_game()
         game.reset()
 
@@ -101,7 +101,9 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         for i in range(last_ep + 1, self.training_episodes):
             # self play
-            self_play_data: Deque[Tuple] = deque([], maxlen=self.training_queue_length)
+            self_play_data: Deque[Tuple[NDArray, A0NNOutput]] = deque(
+                [], maxlen=self.training_queue_length
+            )
             with ThreadPoolExecutor(max_workers=self.thread_max_workers) as executor:
                 futures = [
                     executor.submit(self.train_once)

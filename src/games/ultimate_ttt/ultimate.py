@@ -447,6 +447,7 @@ class UltimateTicTacToe(Game[UltimateState, UltimateIR]):
         elif UltimateTicTacToe._is_win(P2, state.board):
             return P2WIN
         elif UltimateTicTacToe._is_board_filled(state.board):
+            # TODO: if board is filled, check who won more squares?
             return 0
         else:
             raise RuntimeError(f"Calling reward function when game not ended: {state}")

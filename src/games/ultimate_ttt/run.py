@@ -14,6 +14,7 @@ from keras.layers import (  # type: ignore
 )
 from keras.models import Model  # type: ignore
 from keras.optimizers import Adam  # type: ignore
+from numpy.typing import NDArray
 from typing_extensions import override
 
 from games.game import P1, P2, VALID, Action, State
@@ -201,9 +202,12 @@ class UltimateNeuralNetwork(NeuralNetwork):
     def __init__(self, model_folder: str) -> None:
         super().__init__(model_folder)
 
+        # each layer is a 4D tensor consisting of: batch_size, board_height, board_width, num_channels
+        # channel 0: board state, channel 1: active nonant mask
         input = Input(shape=(9, 9, 2), name="UltimateBoardInput")
         prev = input
 
+        # normalize along channels axis
         for _ in range(self.NUM_CONV_LAYERS):
             prev = Activation("relu")(
                 BatchNormalization(axis=3)(
@@ -223,9 +227,11 @@ class UltimateNeuralNetwork(NeuralNetwork):
             Activation("relu")(BatchNormalization(axis=1)(Dense(256)(dense1)))
         )
 
+        # policy, guessing the value of each valid action at the input state
         pi = Dense(UltimateTicTacToe.num_actions(), activation="softmax", name="pi")(
             dense2
         )
+        # value, guessing the value of the input state
         v = Dense(1, activation="tanh", name="v")(dense2)
 
         self.model = Model(inputs=input, outputs=[pi, v])
@@ -236,7 +242,7 @@ class UltimateNeuralNetwork(NeuralNetwork):
         )
         self.model.summary()
 
-    def train(self, data):
+    def train(self, data: List[Tuple[NDArray, A0NNOutput]]) -> None:
         inputs, outputs = list(zip(*data))
         input_tensors = np.asarray(list(inputs))
         target_pis = np.asarray([output.policy for output in outputs])
@@ -249,7 +255,7 @@ class UltimateNeuralNetwork(NeuralNetwork):
             shuffle=True,
         )
 
-    def predict(self, inputs):
+    def predict(self, inputs: List[NDArray]) -> List[A0NNOutput]:
         tensors = np.asarray(list(inputs))
         pis, vs = self.model.predict(tensors, verbose=0)
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]

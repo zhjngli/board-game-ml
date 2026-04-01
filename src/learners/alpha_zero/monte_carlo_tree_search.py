@@ -24,12 +24,19 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
         nn: NeuralNetwork,
         params: MCTSParameters,
     ) -> None:
+        # q values for state-action pair
         self.q: Dict[Tuple[Immutable, Action], float] = {}
+        # number of times state-action pair was visited
         self.nsa: Dict[Tuple[Immutable, Action], int] = {}
+        # number of times state was visited
         self.ns: Dict[Immutable, int] = {}
+        # reward value at terminal states
         self.evs: Dict[Immutable, float] = {}
+        # set of terminal states (for detecting game-over independent of reward value)
         self.terminals: Set[Immutable] = set()
+        # valid actions at a game state
         self.vas: Dict[Immutable, List[ActionStatus]] = {}
+        # the action policies at a game state
         self.ps: Dict[Immutable, NDArray] = {}
 
         self.game = game
@@ -42,6 +49,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
         self.dirichlet_epsilon = params.dirichlet_epsilon
 
     def action_probabilities(self, state: State, temperature: float) -> List[float]:
+        # TODO: output NDArray instead of list, might have more optimized calculations?
         for _ in range(self.num_searches):
             self.search(state, is_root=True)
 
@@ -58,6 +66,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
             probs[best] = 1
             return probs
 
+        # probability of each action weighted by how many times the state has been visited
         visits = [n ** (1 / temperature) for n in sa_visits]
         total_visits = sum(visits)
         if total_visits == 0:
@@ -116,6 +125,8 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
         best_u = -float("inf")
         best_a = -1
 
+        # find the action with the highest upper confidence bound u
+        # u(s, a) = q(s, a) + c_puct * pi(s, a) * sqrt(sum all actions b: (N(s, b)) / (1 + N(s, a))
         for a in range(self.game.num_actions()):
             if valids[a]:
                 if (ir, a) in self.q:
@@ -127,7 +138,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
                         self.cpuct
                         * self.ps[ir][a]
                         * math.sqrt(self.ns[ir] + self.epsilon)
-                    )
+                    )  # TODO: how does epsilon change the upper confidence bound
 
                 if u > best_u:
                     best_u = u
