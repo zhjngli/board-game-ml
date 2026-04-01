@@ -99,6 +99,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         last_ep = self.load_latest_model()
         self.load_training_history()
 
+        pit_history: List[Tuple[int, bool, float]] = []
         for i in range(last_ep + 1, self.training_episodes):
             print(f"\n{'='*60}")
             print(f"Episode {i}/{self.training_episodes - 1}")
@@ -152,7 +153,9 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
             # if model is good enough, keep it
             print(f"\nPitting new model vs previous ({self.pit_games} games)...")
-            accepted = self.pit()
+            accepted, wins, losses, draws, win_rate = self.pit()
+            pit_history.append((i, accepted, win_rate))
+
             if accepted:
                 print(f"New model ACCEPTED — saving as ep_{i:07d} and best_model")
                 self.nn.save(f"ep_{i:07d}_model.weights.h5")
@@ -161,11 +164,13 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 print("New model REJECTED — reverting to previous model")
                 self.nn.load("temp_model.weights.h5")
 
+            self._print_pit_summary(pit_history)
+
         print(f"\n{'='*60}")
         print("Training complete!")
         print(f"{'='*60}")
 
-    def pit(self) -> bool:
+    def pit(self) -> Tuple[bool, int, int, int, float]:
         prev_mtcs = MonteCarloTreeSearch(
             self.create_game(), self.pn, self.eval_mcts_params
         )
@@ -214,12 +219,47 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         # TODO: should win percentage be based on total games?
         # candidate becomes p1 after the switch
-        win_rate = p1wins / (p1wins + p2wins) if (p1wins + p2wins) > 0 else 0
+        win_rate = p1wins / (p1wins + p2wins) if (p1wins + p2wins) > 0 else 0.0
+        accepted = p1wins + p2wins != 0 and win_rate > self.pit_threshold
         print(
             f"Pit results: new model {p1wins}W / {p2wins}L / {draws}D"
             f" — win rate {win_rate:.1%} (threshold {self.pit_threshold:.0%})"
         )
-        return p1wins + p2wins != 0 and win_rate > self.pit_threshold
+        return accepted, p1wins, p2wins, draws, win_rate
+
+    @staticmethod
+    def _print_pit_summary(
+        pit_history: List[Tuple[int, bool, float]],
+    ) -> None:
+        def _avg_win_rate(entries: List[Tuple[int, bool, float]]) -> str:
+            if not entries:
+                return "n/a"
+            return f"{sum(e[2] for e in entries) / len(entries):.1%}"
+
+        def _accept_rate(entries: List[Tuple[int, bool, float]]) -> str:
+            if not entries:
+                return "n/a"
+            accepted = sum(1 for e in entries if e[1])
+            return f"{accepted}/{len(entries)}"
+
+        # pit history table (last 10)
+        recent = pit_history[-10:]
+        print("\nPit history (last 10):")
+        for ep, accepted, wr in recent:
+            status = "ACCEPTED" if accepted else "rejected"
+            print(f"  ep {ep:>3}: {wr:.1%} {status}")
+
+        # rolling avg win rates
+        last_5 = pit_history[-5:]
+        last_10 = pit_history[-10:]
+        parts = [f"last 5: {_avg_win_rate(last_5)}"]
+        if len(pit_history) > 5:
+            parts.append(f"last 10: {_avg_win_rate(last_10)}")
+        if len(pit_history) > 10:
+            parts.append(f"all: {_avg_win_rate(pit_history)}")
+        print(
+            f"Accept rate: {_accept_rate(last_10)}  |  Avg win rate: {'  |  '.join(parts)}"
+        )
 
     def save_training_history(self, file: str) -> None:
         if not os.path.exists(self.training_examples_folder):

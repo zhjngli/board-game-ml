@@ -16,11 +16,12 @@ from keras.models import Model  # type: ignore
 from keras.optimizers import Adam  # type: ignore
 from typing_extensions import override
 
-from games.game import P1, P2, VALID, Action, NNInput, State
+from games.game import P1, P2, VALID, Action, NNInput
 from games.ultimate_ttt.ultimate import (
     Location,
     Section,
     UltimateIR,
+    UltimateState,
     UltimateTicTacToe,
     ir_to_state,
 )
@@ -299,7 +300,7 @@ eval_mcts_params = MCTSParameters(
 )
 
 
-def alpha_zero_trained_game():
+def alpha_zero_train():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     a0 = AlphaZero(
         UltimateTicTacToe,
@@ -308,7 +309,7 @@ def alpha_zero_trained_game():
             temp_threshold=11,
             pit_games=20,
             pit_threshold=0.55,
-            training_episodes=200,
+            training_episodes=50,
             training_games_per_episode=25,
             training_queue_length=25000,
             training_hist_max_len=20,
@@ -320,29 +321,36 @@ def alpha_zero_trained_game():
     )
     a0.train()
 
+
+def self_play_demo(model: str = "best_model.weights.h5") -> None:
+    """Load a saved model and play a game against itself to see how it performs."""
+    cur_dir = pathlib.Path(__file__).parent.resolve()
     g = UltimateTicTacToe()
     nn = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")
-    nn.load("best_model.weights.h5")
+    nn.load(model)
     mcts = MonteCarloTreeSearch(g, nn, eval_mcts_params)
 
-    def play(s: State) -> Action:
+    print(f"Self-play demo: {model}")
+    print(f"MCTS searches per move: {eval_mcts_params.num_searches}\n")
+
+    def play(s: UltimateState) -> Action:
         return int(np.argmax(mcts.action_probabilities(s, temperature=0)))
 
     while not g.is_finished():
         print(f"\n{g.show()}\n")
         sec, loc = UltimateTicTacToe.from_action(play(g.state()))
         g.play(sec, loc)
-        print(f"computer X plays at section {sec} location {loc}")
-        if g.is_finished():
-            break
-
-        print(f"\n{g.show()}\n")
-        sec, loc = UltimateTicTacToe.from_action(play(g.state()))
-        g.play(sec, loc)
-        print(f"computer O plays at section {sec} location {loc}")
+        player_label = "X" if g.state().player == P2 else "O"
+        print(f"computer {player_label} plays at section {sec} location {loc}")
 
     print(g.show())
-    print("\ngame over!")
+    reward = g.calculate_reward(g.state())
+    if reward == 1:
+        print("\nX wins!")
+    elif reward == -1:
+        print("\nO wins!")
+    else:
+        print("\nDraw!")
 
 
 def vs_alpha_zero_game():
@@ -352,7 +360,7 @@ def vs_alpha_zero_game():
     nn.load("best_model.h5")
     mcts = MonteCarloTreeSearch(g, nn, eval_mcts_params)
 
-    def nn_play(s: State) -> Action:
+    def nn_play(s: UltimateState) -> Action:
         return int(np.argmax(mcts.action_probabilities(s, temperature=0)))
 
     while not g.is_finished():
@@ -378,5 +386,4 @@ def vs_alpha_zero_game():
 
 
 def main() -> None:
-    alpha_zero_trained_game()
-    vs_alpha_zero_game()
+    self_play_demo()
