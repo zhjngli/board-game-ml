@@ -476,7 +476,12 @@ class TTTNeuralNetwork(NeuralNetwork[NNInput, A0NNOutput]):
         boards = np.asarray(
             [i if isinstance(i, np.ndarray) else i.board for i in inputs]  # type: ignore[attr-defined]  # backward compat: old .pkl files store A0NNInput(board=...)
         )
-        pis, vs = self.model.predict(boards, verbose=0)
+        # Use direct model call instead of model.predict() for thread safety —
+        # predict() has internal batching state that races with BatchNormalization
+        # when called from multiple threads during self-play.
+        result = self.model(boards, training=False)
+        pis = result[0].numpy()
+        vs = result[1].numpy()
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
     def save(self, file: str) -> None:

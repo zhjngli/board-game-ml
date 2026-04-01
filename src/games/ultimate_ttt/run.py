@@ -256,7 +256,12 @@ class UltimateNeuralNetwork(NeuralNetwork):
 
     def predict(self, inputs: List[NNInput]) -> List[A0NNOutput]:
         tensors = np.asarray(list(inputs))
-        pis, vs = self.model.predict(tensors, verbose=0)
+        # Use direct model call instead of model.predict() for thread safety —
+        # predict() has internal batching state that races with BatchNormalization
+        # when called from multiple threads during self-play.
+        result = self.model(tensors, training=False)
+        pis = result[0].numpy()
+        vs = result[1].numpy()
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
     def save(self, file: str) -> None:
