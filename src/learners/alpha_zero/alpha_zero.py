@@ -100,7 +100,14 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         self.load_training_history()
 
         for i in range(last_ep + 1, self.training_episodes):
+            print(f"\n{'='*60}")
+            print(f"Episode {i}/{self.training_episodes - 1}")
+            print(f"{'='*60}")
+
             # self play
+            print(
+                f"Self-play: {self.training_games_per_episode} games with {self.thread_max_workers} threads..."
+            )
             self_play_data: Deque[Tuple[NDArray, A0NNOutput]] = deque(
                 [], maxlen=self.training_queue_length
             )
@@ -112,15 +119,22 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 for future in futures:
                     self_play_data.extend(future.result())
 
+            print(f"Self-play generated {len(self_play_data)} training examples")
             self.training_history.append(self_play_data)
 
             if len(self.training_history) > self.training_hist_max_len:
                 self.training_history.pop(0)
 
+            total_examples = sum(len(d) for d in self.training_history)
+            print(
+                f"Training history: {len(self.training_history)} episodes, {total_examples} total examples"
+            )
+
             # i-1: last episode's model played these games
             self.save_training_history(f"training_examples_{i-1:07d}.pkl")
 
             # train model
+            print("\nTraining neural network...")
             self.nn.save("temp_model.weights.h5")
             self.pn.load("temp_model.weights.h5")
 
@@ -137,11 +151,19 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                     print(f"Failed to train with error {e}, retrying...")
 
             # if model is good enough, keep it
-            if self.pit():
+            print(f"\nPitting new model vs previous ({self.pit_games} games)...")
+            accepted = self.pit()
+            if accepted:
+                print(f"New model ACCEPTED — saving as ep_{i:07d} and best_model")
                 self.nn.save(f"ep_{i:07d}_model.weights.h5")
                 self.nn.save("best_model.weights.h5")
             else:
+                print("New model REJECTED — reverting to previous model")
                 self.nn.load("temp_model.weights.h5")
+
+        print(f"\n{'='*60}")
+        print("Training complete!")
+        print(f"{'='*60}")
 
     def pit(self) -> bool:
         prev_mtcs = MonteCarloTreeSearch(
@@ -192,7 +214,12 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         # TODO: should win percentage be based on total games?
         # candidate becomes p1 after the switch
-        return p1wins + p2wins != 0 and p1wins / (p1wins + p2wins) > self.pit_threshold
+        win_rate = p1wins / (p1wins + p2wins) if (p1wins + p2wins) > 0 else 0
+        print(
+            f"Pit results: new model {p1wins}W / {p2wins}L / {draws}D"
+            f" — win rate {win_rate:.1%} (threshold {self.pit_threshold:.0%})"
+        )
+        return p1wins + p2wins != 0 and win_rate > self.pit_threshold
 
     def save_training_history(self, file: str) -> None:
         if not os.path.exists(self.training_examples_folder):
