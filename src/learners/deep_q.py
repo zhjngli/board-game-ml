@@ -7,7 +7,7 @@ from typing import Deque, Generic, List, NamedTuple, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from games.game import Action, Game, Immutable, State
+from games.game import Action, Game, Immutable, State, VALID
 from nn.neural_network import NeuralNetwork
 
 
@@ -39,6 +39,7 @@ class DQNOutput(NamedTuple):
 
 
 Reward = float
+Memory = Tuple[State, Action, State, Reward, bool]
 
 
 class DeepQLearner(Generic[State, Immutable]):
@@ -53,9 +54,7 @@ class DeepQLearner(Generic[State, Immutable]):
         self.game = game
         self.predict_nn = nn
         self.target_nn = target_nn
-        self.memory: Deque[Tuple[State, Action, State, Reward, bool]] = deque(
-            [], maxlen=params.memory_size
-        )
+        self.memory: Deque[Memory] = deque([], maxlen=params.memory_size)
         self.memory_folder = memory_folder
 
         self.training_episodes = params.training_episodes
@@ -77,6 +76,35 @@ class DeepQLearner(Generic[State, Immutable]):
         self.valid_action_reward = params.valid_action_reward
 
         self.rng = np.random.default_rng()
+        self.steps = 0
+        self.epsilon = self.max_epsilon
+
+    def _valid_actions(self, state: State) -> NDArray[np.int_]:
+        action_statuses = np.asarray(self.game.actions(state))
+        return np.flatnonzero(action_statuses == VALID)
+
+    def _choose_action(self, state: State) -> Action:
+        valid_actions = self._valid_actions(state)
+        if len(valid_actions) == 0:
+            raise ValueError("Cannot choose an action when no valid actions are available")
+
+        if np.random.sample() < self.epsilon:
+            return int(np.random.choice(valid_actions))
+
+        dqn_out: DQNOutput = self.predict_nn.predict([state])[0]
+        valid_qs = dqn_out.policy[valid_actions]
+        return int(valid_actions[int(np.argmax(valid_qs))])
+
+    def _freeze_transition(
+        self, state: State, action: Action, next_state: State, reward: Reward, done: bool
+    ) -> Memory:
+        return (
+            state,
+            action,
+            copy.deepcopy(next_state),
+            reward,
+            done,
+        )
 
     def calculate_epsilon(self, episode: int) -> float:
         return self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(
@@ -110,23 +138,11 @@ class DeepQLearner(Generic[State, Immutable]):
             self.steps += 1
 
             score = self.game.calculate_reward(state)
+            state_snapshot = copy.deepcopy(state)
             # print(f"state:\n{state.board}")
             # print(f"next: {state.next}")  # type: ignore
 
-            # epsilon greedy
-            action_statuses = np.asarray(self.game.actions(state))
-            # valid_actions = np.where(action_statuses == VALID)[0]
-            if np.random.sample() < self.epsilon:
-                a = np.random.choice(len(action_statuses))
-            else:
-                dqn_out: DQNOutput = self.predict_nn.predict([state])[0]
-                a = int(np.argmax(dqn_out.policy))
-                # if not np.isin(valid_actions, a).any():
-                #     # TODO: might be an issue with my model, not the implementation?
-                #     # TODO: punish invalid actions?
-                #     # policy not robust enough, so when masked with action statuses it produces no valid actions
-                #     a = np.random.choice(valid_actions)
-                #     print(f"invalid, chose {a} randomly")
+            a = self._choose_action(state)
 
             # calculations based on action chosen
             # TODO: very sparse rewards, only at game end
@@ -141,7 +157,7 @@ class DeepQLearner(Generic[State, Immutable]):
                 reward = -1
                 game_end = False
 
-            mem = (state, a, next_state, reward, game_end)
+            mem = self._freeze_transition(state_snapshot, a, next_state, reward, game_end)
             self.memory.append(mem)
 
             # replay memory
@@ -149,7 +165,7 @@ class DeepQLearner(Generic[State, Immutable]):
                 self.steps_to_train_shortterm > 0
                 and self.steps % self.steps_to_train_shortterm == 0
             ):
-                self.replay_memory(np.array([mem]))
+                self.replay_memory(np.asarray([mem], dtype=object))
 
             if (
                 self.steps_to_train_longterm > 0
@@ -158,7 +174,9 @@ class DeepQLearner(Generic[State, Immutable]):
                 and len(self.memory) > self.min_replay_size
             ):
                 minibatch = self.rng.choice(
-                    np.array(self.memory), size=self.minibatch_size, replace=False
+                    np.asarray(self.memory, dtype=object),
+                    size=self.minibatch_size,
+                    replace=False,
                 )
                 self.replay_memory(minibatch)
 
@@ -179,11 +197,18 @@ class DeepQLearner(Generic[State, Immutable]):
         dqn_outs: List[DQNOutput] = self.predict_nn.predict(list(states))
         next_dqn_outs: List[DQNOutput] = self.target_nn.predict(list(next_states))
 
-        next_qs = np.array([out.policy for out in next_dqn_outs])
+        max_next_qs = np.asarray(rewards, dtype=float)
+        for i, next_state in enumerate(next_states):
+            if bool(game_ends[i]):
+                continue
 
-        max_next_qs = np.where(
-            game_ends, rewards, rewards + self.gamma * np.max(next_qs, axis=1)
-        )
+            valid_actions = self._valid_actions(next_state)
+            if len(valid_actions) == 0:
+                continue
+
+            next_policy = next_dqn_outs[i].policy[valid_actions]
+            max_next_qs[i] = float(rewards[i]) + self.gamma * float(np.max(next_policy))
+
         # np.arange(len(qs)) instead of `:`?
         for i in range(len(dqn_outs)):
             dqn_outs[i].policy[actions[i]] = (1 - self.alpha) * dqn_outs[i].policy[
