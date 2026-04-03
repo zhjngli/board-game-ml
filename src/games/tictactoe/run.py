@@ -455,8 +455,6 @@ class TTTNeuralNetwork(NeuralNetwork[NNInput, A0NNOutput]):
             optimizer=Adam(learning_rate=self.params.learning_rate),
             metrics={"pi": ["accuracy", "categorical_crossentropy"], "v": ["mse"]},
         )
-        self.model.summary()
-
     def train(self, data: List[Tuple[NNInput, A0NNOutput]]) -> None:
         inputs, outputs = list(zip(*data))
         input_boards = np.asarray(

@@ -240,8 +240,6 @@ class UltimateNeuralNetwork(NeuralNetwork):
             optimizer=Adam(learning_rate=self.LEARN_RATE),
             metrics={"pi": ["accuracy", "categorical_crossentropy"], "v": ["mse"]},
         )
-        self.model.summary()
-
     def train(self, data: List[Tuple[NNInput, A0NNOutput]]) -> None:
         inputs, outputs = list(zip(*data))
         input_tensors = np.asarray(list(inputs))
