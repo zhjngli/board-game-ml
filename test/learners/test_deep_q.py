@@ -44,6 +44,9 @@ class DummyNetwork(NeuralNetwork[DummyState, DQNOutput]):
     def get_weights(self):
         return []
 
+    def summary(self) -> None:
+        pass
+
 
 class SingleStepMaskingGame(Game[DummyState, str]):
     def __init__(self) -> None:

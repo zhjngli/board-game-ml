@@ -102,6 +102,7 @@ def deep_q_3x3_trained_game():
     target_nn = DigitParty3x3NeuralNetwork(
         params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/deepq_3x3_models/"
     )
+    nn.summary()
     deepq = DeepQLearner(
         DigitParty(n=3),
         nn,

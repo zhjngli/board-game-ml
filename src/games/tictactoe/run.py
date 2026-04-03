@@ -455,7 +455,6 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
             optimizer=Adam(learning_rate=self.params.learning_rate),
             metrics={"pi": ["accuracy", "categorical_crossentropy"], "v": ["mse"]},
         )
-        self.model.summary()
 
     def train(self, data: List[Tuple[A0NNInput, A0NNOutput]]) -> None:
         inputs: List[A0NNInput]
@@ -493,6 +492,9 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
 
     def get_weights(self):
         return self.model.get_weights()
+
+    def summary(self) -> None:
+        self.model.summary()
 
 
 orig_nn_params: TTTNNParams = TTTNNParams(

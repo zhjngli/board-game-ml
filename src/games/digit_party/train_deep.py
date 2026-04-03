@@ -104,7 +104,6 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, DQNOutput]):
             optimizer=Adam(learning_rate=self.params.learning_rate),
             metrics={"pi": ["accuracy", "mse", "mae"], "v": ["accuracy", "mse", "mae"]},
         )
-        self.model.summary()
 
     def train(self, data: List[Tuple[DigitPartyIR, DQNOutput]]) -> None:
         inputs: List[DigitPartyIR]
@@ -157,6 +156,9 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, DQNOutput]):
 
     def get_weights(self):
         return self.model.get_weights()
+
+    def summary(self) -> None:
+        self.model.summary()
 
 
 orig_nn_params: DP3NNParams = DP3NNParams(
