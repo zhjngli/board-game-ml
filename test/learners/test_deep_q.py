@@ -2,8 +2,8 @@ from typing import List
 
 import numpy as np
 
-from games.game import P1, VALID, ActionStatus, BasicState, Game, INVAL
-from learners.deep_q import DQNOutput, DeepQLearner, DeepQParameters
+from games.game import INVAL, P1, VALID, ActionStatus, BasicState, Game
+from learners.deep_q import DeepQLearner, DeepQParameters, DQNOutput
 from nn.neural_network import NeuralNetwork
 
 
@@ -27,7 +27,9 @@ class DummyNetwork(NeuralNetwork[DummyState, DQNOutput]):
         preds: List[DQNOutput] = []
         for state in inputs:
             out = self.outputs[state.tag]
-            preds.append(DQNOutput(policy=np.array(out.policy, dtype=float), value=out.value))
+            preds.append(
+                DQNOutput(policy=np.array(out.policy, dtype=float), value=out.value)
+            )
         return preds
 
     def save(self, file: str) -> None:

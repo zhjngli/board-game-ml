@@ -2,8 +2,8 @@ import pathlib
 
 from games.digit_party.game import DigitParty
 from games.digit_party.train_deep import (
-    DP3NNParams,
     DigitParty3x3NeuralNetwork,
+    DP3NNParams,
     deep_play_digit_party,
     opt_nn_params,
 )

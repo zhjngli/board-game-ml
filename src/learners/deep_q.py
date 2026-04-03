@@ -7,7 +7,7 @@ from typing import Deque, Generic, List, NamedTuple, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from games.game import Action, Game, Immutable, State, VALID
+from games.game import VALID, Action, Game, Immutable, State
 from nn.neural_network import NeuralNetwork
 
 
@@ -97,7 +97,9 @@ class DeepQLearner(Generic[State, Immutable]):
     def _choose_action(self, state: State) -> Action:
         valid_actions = self._valid_actions(state)
         if len(valid_actions) == 0:
-            raise ValueError("Cannot choose an action when no valid actions are available")
+            raise ValueError(
+                "Cannot choose an action when no valid actions are available"
+            )
 
         if np.random.sample() < self.epsilon:
             return int(np.random.choice(valid_actions))
@@ -107,7 +109,12 @@ class DeepQLearner(Generic[State, Immutable]):
         return int(valid_actions[int(np.argmax(valid_qs))])
 
     def _freeze_transition(
-        self, state: State, action: Action, next_state: State, reward: Reward, done: bool
+        self,
+        state: State,
+        action: Action,
+        next_state: State,
+        reward: Reward,
+        done: bool,
     ) -> Memory:
         return (
             state,
@@ -147,7 +154,10 @@ class DeepQLearner(Generic[State, Immutable]):
             if i % self.episodes_per_memory_save == 0:
                 self.save_memory(f"ep_{i:07d}_memory.pkl")
 
-            if self.episodes_per_stats_print > 0 and i % self.episodes_per_stats_print == 0:
+            if (
+                self.episodes_per_stats_print > 0
+                and i % self.episodes_per_stats_print == 0
+            ):
                 print(
                     "Episode"
                     f" {i}: epsilon={self.epsilon:.4f},"
@@ -195,7 +205,9 @@ class DeepQLearner(Generic[State, Immutable]):
                 game_end = False
                 self.invalid_action_count += 1
 
-            mem = self._freeze_transition(state_snapshot, a, next_state, reward, game_end)
+            mem = self._freeze_transition(
+                state_snapshot, a, next_state, reward, game_end
+            )
             self.memory.append(mem)
 
             # replay memory
