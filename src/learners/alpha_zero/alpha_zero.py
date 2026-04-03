@@ -99,7 +99,9 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         last_ep = self.load_latest_model()
         self.load_training_history()
 
-        pit_history: List[Tuple[int, bool, float]] = []
+        self.nn.summary()
+
+        pit_history: List[Tuple[int, bool, int, int, int, float]] = []
         for i in range(last_ep + 1, self.training_episodes):
             print(f"\n{'='*60}")
             print(f"Episode {i}/{self.training_episodes - 1}")
@@ -154,7 +156,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             # if model is good enough, keep it
             print(f"\nPitting new model vs previous ({self.pit_games} games)...")
             accepted, wins, losses, draws, win_rate = self.pit()
-            pit_history.append((i, accepted, win_rate))
+            pit_history.append((i, accepted, wins, losses, draws, win_rate))
 
             if accepted:
                 print(f"New model ACCEPTED — saving as ep_{i:07d} and best_model")
@@ -229,14 +231,18 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
     @staticmethod
     def _print_pit_summary(
-        pit_history: List[Tuple[int, bool, float]],
+        pit_history: List[Tuple[int, bool, int, int, int, float]],
     ) -> None:
-        def _avg_win_rate(entries: List[Tuple[int, bool, float]]) -> str:
+        def _avg_win_rate(
+            entries: List[Tuple[int, bool, int, int, int, float]],
+        ) -> str:
             if not entries:
                 return "n/a"
-            return f"{sum(e[2] for e in entries) / len(entries):.1%}"
+            return f"{sum(e[5] for e in entries) / len(entries):.1%}"
 
-        def _accept_rate(entries: List[Tuple[int, bool, float]]) -> str:
+        def _accept_rate(
+            entries: List[Tuple[int, bool, int, int, int, float]],
+        ) -> str:
             if not entries:
                 return "n/a"
             accepted = sum(1 for e in entries if e[1])
@@ -245,9 +251,9 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         # pit history table (last 10)
         recent = pit_history[-10:]
         print("\nPit history (last 10):")
-        for ep, accepted, wr in recent:
+        for ep, accepted, w, l, d, wr in recent:
             status = "ACCEPTED" if accepted else "rejected"
-            print(f"  ep {ep:>3}: {wr:.1%} {status}")
+            print(f"  ep {ep:>3}: {w}W/{l}L/{d}D {wr:.1%} {status}")
 
         # rolling avg win rates
         last_5 = pit_history[-5:]
