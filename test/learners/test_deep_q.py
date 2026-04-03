@@ -152,6 +152,7 @@ def build_params() -> DeepQParameters:
         episodes_per_model_save=1,
         episodes_per_memory_save=1,
         episodes_per_stats_print=0,
+        episodes_per_evaluation=0,
     )
 
 
@@ -244,3 +245,37 @@ def test_run_game_once_stores_frozen_state_snapshots() -> None:
     state, _, next_state, _, _ = learner.memory[0]
     assert int(state.board[0]) == 0
     assert int(next_state.board[0]) == 99
+
+
+def test_train_calls_evaluator_on_schedule() -> None:
+    game = SingleStepMaskingGame()
+    predict_nn = DummyNetwork(
+        outputs={
+            "start": DQNOutput(policy=np.array([1.0, 100.0]), value=0.0),
+            "terminal": DQNOutput(policy=np.array([0.0, 0.0]), value=0.0),
+        }
+    )
+    params = build_params()._replace(
+        training_episodes=2,
+        episodes_per_model_save=99,
+        episodes_per_memory_save=99,
+        episodes_per_evaluation=1,
+    )
+    evaluation_calls: List[str] = []
+
+    def evaluator() -> str:
+        evaluation_calls.append("called")
+        return "ok"
+
+    learner = DeepQLearner(
+        game=game,
+        nn=predict_nn,
+        target_nn=DummyNetwork(outputs={}),
+        params=params,
+        memory_folder="",
+        evaluator=evaluator,
+    )
+
+    learner.train()
+
+    assert evaluation_calls == ["called", "called"]

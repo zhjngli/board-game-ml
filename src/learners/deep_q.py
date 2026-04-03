@@ -2,7 +2,7 @@ import copy
 import os
 import pickle
 from collections import deque
-from typing import Deque, Generic, List, NamedTuple, Tuple
+from typing import Callable, Deque, Generic, List, NamedTuple, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -28,6 +28,7 @@ class DeepQParameters(NamedTuple):
     episodes_per_model_save: int
     episodes_per_memory_save: int
     episodes_per_stats_print: int
+    episodes_per_evaluation: int
 
 
 Policy = NDArray  # TODO: one dimensional NDArray of arbitrary length
@@ -56,6 +57,7 @@ class DeepQLearner(Generic[State, Immutable]):
         target_nn: NeuralNetwork[State, DQNOutput],
         params: DeepQParameters,
         memory_folder: str,
+        evaluator: Callable[[], str] | None = None,
     ) -> None:
         self.game = game
         self.predict_nn = nn
@@ -67,6 +69,7 @@ class DeepQLearner(Generic[State, Immutable]):
         self.episodes_per_model_save = params.episodes_per_model_save
         self.episodes_per_memory_save = params.episodes_per_memory_save
         self.episodes_per_stats_print = params.episodes_per_stats_print
+        self.episodes_per_evaluation = params.episodes_per_evaluation
 
         self.min_replay_size = params.min_replay_size
         self.minibatch_size = params.minibatch_size
@@ -89,6 +92,7 @@ class DeepQLearner(Generic[State, Immutable]):
         self.shortterm_replay_calls = 0
         self.longterm_replay_calls = 0
         self.target_syncs = 0
+        self.evaluator = evaluator
 
     def _valid_actions(self, state: State) -> NDArray[np.int_]:
         action_statuses = np.asarray(self.game.actions(state))
@@ -162,6 +166,12 @@ class DeepQLearner(Generic[State, Immutable]):
                 last_target_syncs = self.target_syncs
 
             # TODO: track efficacy of learning (e.g. play some number of games and track score)
+            if (
+                self.evaluator is not None
+                and self.episodes_per_evaluation > 0
+                and i % self.episodes_per_evaluation == 0
+            ):
+                print(f"Evaluation after episode {i}: {self.evaluator()}")
 
     def run_game_once(self) -> EpisodeStats:
         self.game.reset()
