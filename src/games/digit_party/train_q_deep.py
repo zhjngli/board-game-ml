@@ -5,7 +5,6 @@ from games.digit_party.train_deep import (
     DigitParty3x3NeuralNetwork,
     DP3NNParams,
     deep_play_digit_party,
-    opt_nn_params,
 )
 from learners.deep_q import DeepQLearner, DeepQParameters
 
@@ -14,16 +13,17 @@ Attempts to train a 3x3 digit party neural network using the deep q learning alg
 and with hyperparameters found from bayesian optimization.
 """
 
+# Temporary DQN baseline.
 DQN_3X3_NN_PARAMS = DP3NNParams(
-    conv_layers=opt_nn_params.conv_layers,
-    conv_filters=opt_nn_params.conv_filters,
-    dense_layers=opt_nn_params.dense_layers,
-    dense_units=opt_nn_params.dense_units,
-    learning_rate=opt_nn_params.learning_rate,
-    batch_size=opt_nn_params.batch_size,
+    conv_layers=8,
+    conv_filters=14,
+    dense_layers=1,
+    dense_units=337,
+    learning_rate=0.0009647204266707786,
+    batch_size=64,
     epochs=1,
     dropout_rate=0.0,
-    output_activation=opt_nn_params.output_activation,
+    output_activation="linear",
 )
 
 

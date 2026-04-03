@@ -94,20 +94,6 @@ class DeepQLearner(Generic[State, Immutable]):
         action_statuses = np.asarray(self.game.actions(state))
         return np.flatnonzero(action_statuses == VALID)
 
-    def _choose_action(self, state: State) -> Action:
-        valid_actions = self._valid_actions(state)
-        if len(valid_actions) == 0:
-            raise ValueError(
-                "Cannot choose an action when no valid actions are available"
-            )
-
-        if np.random.sample() < self.epsilon:
-            return int(np.random.choice(valid_actions))
-
-        dqn_out: DQNOutput = self.predict_nn.predict([state])[0]
-        valid_qs = dqn_out.policy[valid_actions]
-        return int(valid_actions[int(np.argmax(valid_qs))])
-
     def _freeze_transition(
         self,
         state: State,
@@ -175,6 +161,8 @@ class DeepQLearner(Generic[State, Immutable]):
                 last_longterm_replays = self.longterm_replay_calls
                 last_target_syncs = self.target_syncs
 
+            # TODO: track efficacy of learning (e.g. play some number of games and track score)
+
     def run_game_once(self) -> EpisodeStats:
         self.game.reset()
         state = self.game.state()
@@ -189,7 +177,19 @@ class DeepQLearner(Generic[State, Immutable]):
             # print(f"state:\n{state.board}")
             # print(f"next: {state.next}")  # type: ignore
 
-            a = self._choose_action(state)
+            # epsilon greedy over legal actions only
+            valid_actions = self._valid_actions(state)
+            if len(valid_actions) == 0:
+                raise ValueError(
+                    "Cannot choose an action when no valid actions are available"
+                )
+
+            if np.random.sample() < self.epsilon:
+                a = int(np.random.choice(valid_actions))
+            else:
+                dqn_out: DQNOutput = self.predict_nn.predict([state])[0]
+                valid_qs = dqn_out.policy[valid_actions]
+                a = int(valid_actions[int(np.argmax(valid_qs))])
 
             # calculations based on action chosen
             # TODO: very sparse rewards, only at game end
