@@ -2,6 +2,7 @@ import pathlib
 
 from games.digit_party.game import DigitParty
 from games.digit_party.train_deep import (
+    DP3NNParams,
     DigitParty3x3NeuralNetwork,
     deep_play_digit_party,
     opt_nn_params,
@@ -13,14 +14,26 @@ Attempts to train a 3x3 digit party neural network using the deep q learning alg
 and with hyperparameters found from bayesian optimization.
 """
 
+DQN_3X3_NN_PARAMS = DP3NNParams(
+    conv_layers=opt_nn_params.conv_layers,
+    conv_filters=opt_nn_params.conv_filters,
+    dense_layers=opt_nn_params.dense_layers,
+    dense_units=opt_nn_params.dense_units,
+    learning_rate=opt_nn_params.learning_rate,
+    batch_size=opt_nn_params.batch_size,
+    epochs=1,
+    dropout_rate=0.0,
+    output_activation=opt_nn_params.output_activation,
+)
+
 
 def deep_q_3x3_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     nn = DigitParty3x3NeuralNetwork(
-        params=opt_nn_params, model_folder=f"{cur_dir}/deepq_3x3_models/"
+        params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/deepq_3x3_models/"
     )
     target_nn = DigitParty3x3NeuralNetwork(
-        params=opt_nn_params, model_folder=f"{cur_dir}/deepq_3x3_models/"
+        params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/deepq_3x3_models/"
     )
     deepq = DeepQLearner(
         DigitParty(n=3),
