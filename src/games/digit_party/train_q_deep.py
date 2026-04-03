@@ -55,6 +55,7 @@ def deep_q_3x3_trained_game():
             training_episodes=10_000,
             episodes_per_model_save=1_000,
             episodes_per_memory_save=1_000,
+            episodes_per_stats_print=100,
         ),
         memory_folder=f"{cur_dir}/deepq_3x3_memory/",
     )

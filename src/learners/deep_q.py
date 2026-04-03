@@ -27,6 +27,7 @@ class DeepQParameters(NamedTuple):
     training_episodes: int
     episodes_per_model_save: int
     episodes_per_memory_save: int
+    episodes_per_stats_print: int
 
 
 Policy = NDArray  # TODO: one dimensional NDArray of arbitrary length
@@ -40,6 +41,11 @@ class DQNOutput(NamedTuple):
 
 Reward = float
 Memory = Tuple[State, Action, State, Reward, bool]
+
+
+class EpisodeStats(NamedTuple):
+    final_reward: Reward
+    steps: int
 
 
 class DeepQLearner(Generic[State, Immutable]):
@@ -60,6 +66,7 @@ class DeepQLearner(Generic[State, Immutable]):
         self.training_episodes = params.training_episodes
         self.episodes_per_model_save = params.episodes_per_model_save
         self.episodes_per_memory_save = params.episodes_per_memory_save
+        self.episodes_per_stats_print = params.episodes_per_stats_print
 
         self.min_replay_size = params.min_replay_size
         self.minibatch_size = params.minibatch_size
@@ -78,6 +85,10 @@ class DeepQLearner(Generic[State, Immutable]):
         self.rng = np.random.default_rng()
         self.steps = 0
         self.epsilon = self.max_epsilon
+        self.invalid_action_count = 0
+        self.shortterm_replay_calls = 0
+        self.longterm_replay_calls = 0
+        self.target_syncs = 0
 
     def _valid_actions(self, state: State) -> NDArray[np.int_]:
         action_statuses = np.asarray(self.game.actions(state))
@@ -117,8 +128,16 @@ class DeepQLearner(Generic[State, Immutable]):
 
         self.steps = 0
         self.epsilon = self.calculate_epsilon(latest_ep)
+        report_rewards: List[float] = []
+        report_steps = 0
+        last_invalid_actions = self.invalid_action_count
+        last_shortterm_replays = self.shortterm_replay_calls
+        last_longterm_replays = self.longterm_replay_calls
+        last_target_syncs = self.target_syncs
         for i in range(latest_ep + 1, self.training_episodes + 1):
-            self.run_game_once()
+            episode_stats = self.run_game_once()
+            report_rewards.append(float(episode_stats.final_reward))
+            report_steps += episode_stats.steps
 
             self.epsilon = self.calculate_epsilon(i)
 
@@ -128,14 +147,32 @@ class DeepQLearner(Generic[State, Immutable]):
             if i % self.episodes_per_memory_save == 0:
                 self.save_memory(f"ep_{i:07d}_memory.pkl")
 
-            # TODO: track efficacy of learning (e.g. play some number of games and track score)
+            if self.episodes_per_stats_print > 0 and i % self.episodes_per_stats_print == 0:
+                print(
+                    "Episode"
+                    f" {i}: epsilon={self.epsilon:.4f},"
+                    f" avg_final_reward={np.mean(report_rewards):.4f},"
+                    f" avg_steps={report_steps / len(report_rewards):.2f},"
+                    f" invalid_actions={self.invalid_action_count - last_invalid_actions},"
+                    f" short_replays={self.shortterm_replay_calls - last_shortterm_replays},"
+                    f" long_replays={self.longterm_replay_calls - last_longterm_replays},"
+                    f" target_syncs={self.target_syncs - last_target_syncs}"
+                )
+                report_rewards = []
+                report_steps = 0
+                last_invalid_actions = self.invalid_action_count
+                last_shortterm_replays = self.shortterm_replay_calls
+                last_longterm_replays = self.longterm_replay_calls
+                last_target_syncs = self.target_syncs
 
-    def run_game_once(self) -> None:
+    def run_game_once(self) -> EpisodeStats:
         self.game.reset()
         state = self.game.state()
+        episode_steps = 0
 
         while not self.game.check_finished(state):
             self.steps += 1
+            episode_steps += 1
 
             score = self.game.calculate_reward(state)
             state_snapshot = copy.deepcopy(state)
@@ -156,6 +193,7 @@ class DeepQLearner(Generic[State, Immutable]):
                 next_state = copy.deepcopy(state)
                 reward = -1
                 game_end = False
+                self.invalid_action_count += 1
 
             mem = self._freeze_transition(state_snapshot, a, next_state, reward, game_end)
             self.memory.append(mem)
@@ -165,6 +203,7 @@ class DeepQLearner(Generic[State, Immutable]):
                 self.steps_to_train_shortterm > 0
                 and self.steps % self.steps_to_train_shortterm == 0
             ):
+                self.shortterm_replay_calls += 1
                 self.replay_memory(np.asarray([mem], dtype=object))
 
             if (
@@ -173,6 +212,7 @@ class DeepQLearner(Generic[State, Immutable]):
                 and len(self.memory) > self.minibatch_size
                 and len(self.memory) > self.min_replay_size
             ):
+                self.longterm_replay_calls += 1
                 minibatch = self.rng.choice(
                     np.asarray(self.memory, dtype=object),
                     size=self.minibatch_size,
@@ -183,8 +223,14 @@ class DeepQLearner(Generic[State, Immutable]):
             # update target network weights
             if self.steps % self.steps_per_target_update == 0:
                 self.target_nn.set_weights(self.predict_nn.get_weights())
+                self.target_syncs += 1
 
             state = next_state
+
+        return EpisodeStats(
+            final_reward=self.game.calculate_reward(state),
+            steps=episode_steps,
+        )
 
     def replay_memory(self, minibatch: NDArray) -> None:
         # minibatch is an array converted from: List[Tuple[State, Action, State, Reward, bool]]

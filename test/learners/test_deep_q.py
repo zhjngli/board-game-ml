@@ -149,6 +149,7 @@ def build_params() -> DeepQParameters:
         training_episodes=1,
         episodes_per_model_save=1,
         episodes_per_memory_save=1,
+        episodes_per_stats_print=0,
     )
 
 
