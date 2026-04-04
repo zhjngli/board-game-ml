@@ -3,7 +3,7 @@ from typing import List
 import numpy as np
 
 from games.game import INVAL, P1, VALID, ActionStatus, BasicState, Game
-from learners.deep_q import DeepQLearner, DeepQParameters, DQNOutput
+from learners.deep_q import DeepQLearner, DeepQParameters, DQNOutput, EvaluationResult
 from nn.neural_network import NeuralNetwork
 
 
@@ -266,9 +266,9 @@ def test_train_calls_evaluator_on_schedule() -> None:
     )
     evaluation_calls: List[str] = []
 
-    def evaluator() -> str:
+    def evaluator() -> EvaluationResult:
         evaluation_calls.append("called")
-        return "ok"
+        return EvaluationResult(score=1.0, summary="ok")
 
     learner = DeepQLearner(
         game=game,

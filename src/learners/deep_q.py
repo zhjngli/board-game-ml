@@ -49,6 +49,11 @@ class EpisodeStats(NamedTuple):
     steps: int
 
 
+class EvaluationResult(NamedTuple):
+    score: float
+    summary: str
+
+
 class DeepQLearner(Generic[State, Immutable]):
     def __init__(
         self,
@@ -57,7 +62,7 @@ class DeepQLearner(Generic[State, Immutable]):
         target_nn: NeuralNetwork[State, DQNOutput],
         params: DeepQParameters,
         memory_folder: str,
-        evaluator: Callable[[], str] | None = None,
+        evaluator: Callable[[], EvaluationResult] | None = None,
     ) -> None:
         self.game = game
         self.predict_nn = nn
@@ -93,6 +98,7 @@ class DeepQLearner(Generic[State, Immutable]):
         self.longterm_replay_calls = 0
         self.target_syncs = 0
         self.evaluator = evaluator
+        self.best_evaluation_score: float | None = None
 
     def _valid_actions(self, state: State) -> NDArray[np.int_]:
         action_statuses = np.asarray(self.game.actions(state))
@@ -165,13 +171,20 @@ class DeepQLearner(Generic[State, Immutable]):
                 last_longterm_replays = self.longterm_replay_calls
                 last_target_syncs = self.target_syncs
 
-            # TODO: track efficacy of learning (e.g. play some number of games and track score)
             if (
                 self.evaluator is not None
                 and self.episodes_per_evaluation > 0
                 and i % self.episodes_per_evaluation == 0
             ):
-                print(f"Evaluation after episode {i}: {self.evaluator()}")
+                evaluation = self.evaluator()
+                print(f"Evaluation after episode {i}: {evaluation.summary}")
+                if (
+                    self.best_evaluation_score is None
+                    or evaluation.score > self.best_evaluation_score
+                ):
+                    self.best_evaluation_score = evaluation.score
+                    self.predict_nn.save("best_model.weights.h5")
+                    print("New best evaluation checkpoint:" f" {evaluation.score:.2f}")
 
     def run_game_once(self) -> EpisodeStats:
         self.game.reset()

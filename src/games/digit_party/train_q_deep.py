@@ -2,16 +2,24 @@ import pathlib
 from typing import NamedTuple
 
 import numpy as np
+from keras.layers import (  # type: ignore
+    Concatenate,
+    Conv2D,
+    Dense,
+    Flatten,
+    Input,
+    Reshape,
+)
+from keras.models import Model  # type: ignore
+from keras.optimizers import Adam  # type: ignore
 
 from games.digit_party.game import DigitParty, DigitPartyPlacement, DigitPartyState
-from games.digit_party.train_deep import DigitParty3x3NeuralNetwork, DP3NNParams
+from games.digit_party.train_deep import DP3NNParams
 from games.game import VALID
-from learners.deep_q import DeepQLearner, DeepQParameters
+from learners.deep_q import DeepQLearner, DeepQParameters, DQNOutput, EvaluationResult
+from nn.neural_network import NeuralNetwork
 
-"""
-Attempts to train a 3x3 digit party neural network using the deep q learning algorithm,
-and with hyperparameters found from bayesian optimization.
-"""
+"""Trains a 3x3 Digit Party network with a DQN-focused architecture baseline."""
 
 # Temporary DQN baseline.
 DQN_3X3_NN_PARAMS = DP3NNParams(
@@ -26,8 +34,8 @@ DQN_3X3_NN_PARAMS = DP3NNParams(
     output_activation="linear",
 )
 
-TRAINING_EVALUATION_GAMES = 100
-TRAINING_EVALUATION_INTERVAL = 500
+TRAINING_EVALUATION_GAMES = 500
+TRAINING_EVALUATION_INTERVAL = 1000
 FINAL_EVALUATION_GAMES = 1000
 
 
@@ -39,10 +47,98 @@ class DigitPartyEvaluation(NamedTuple):
     average_theoretical_max: float
 
 
+class DigitParty3x3DeepQNN(NeuralNetwork[DigitPartyState, DQNOutput]):
+    def __init__(self, params: DP3NNParams, model_folder: str) -> None:
+        super().__init__(model_folder)
+        self.params = params
+
+        input_board = Input(shape=(3, 3), name="dp_3x3_board")
+        input_curr_digit = Input(shape=(1,), name="current_digit")
+        input_next_digit = Input(shape=(1,), name="next_digit")
+
+        board = Reshape((3, 3, 1))(input_board)
+        prev = board
+
+        for _ in range(self.params.conv_layers):
+            prev = Conv2D(
+                filters=self.params.conv_filters,
+                kernel_size=(2, 2),
+                padding="same",
+                activation="relu",
+            )(prev)
+
+        flat = Flatten()(prev)
+        prev = Concatenate()([flat, input_curr_digit, input_next_digit])
+
+        for _ in range(self.params.dense_layers):
+            prev = Dense(self.params.dense_units, activation="relu")(prev)
+
+        q_values = Dense(9, activation=self.params.output_activation, name="q")(prev)
+
+        self.model = Model(
+            inputs=[input_board, input_curr_digit, input_next_digit], outputs=q_values
+        )
+        self.model.compile(
+            loss="mean_squared_error",
+            optimizer=Adam(learning_rate=self.params.learning_rate),
+        )
+
+    def train(self, data: list[tuple[DigitPartyState, DQNOutput]]) -> None:
+        inputs: list[DigitPartyState]
+        outputs: list[DQNOutput]
+        inputs, outputs = list(zip(*data))
+        input_boards = np.asarray([input.board for input in inputs])
+        input_currs = np.asarray(
+            [input.next[0] if input.next[0] is not None else 0 for input in inputs]
+        )
+        input_nexts = np.asarray(
+            [input.next[1] if input.next[1] is not None else 0 for input in inputs]
+        )
+        target_qs = np.asarray([output.policy for output in outputs])
+        self.model.fit(
+            x=[input_boards, input_currs, input_nexts],
+            y=target_qs,
+            batch_size=self.params.batch_size,
+            epochs=self.params.epochs,
+            shuffle=True,
+            verbose=0,
+        )
+
+    def predict(self, inputs: list[DigitPartyState]) -> list[DQNOutput]:
+        input_boards = np.asarray([input.board for input in inputs])
+        input_currs = np.asarray(
+            [input.next[0] if input.next[0] is not None else 0 for input in inputs]
+        )
+        input_nexts = np.asarray(
+            [input.next[1] if input.next[1] is not None else 0 for input in inputs]
+        )
+        qs = self.model.predict([input_boards, input_currs, input_nexts], verbose=0)
+        return [DQNOutput(policy=q, value=0.0) for q in qs]
+
+    def save(self, file: str) -> None:
+        model_path = pathlib.Path(self.model_folder)
+        if not model_path.exists():
+            print(f"Making directory for models at: {self.model_folder}")
+            model_path.mkdir(parents=True)
+        self.model.save_weights(model_path / file)
+
+    def load(self, file: str) -> None:
+        self.model.load_weights(pathlib.Path(self.model_folder) / file)
+
+    def set_weights(self, weights) -> None:
+        self.model.set_weights(weights)
+
+    def get_weights(self):
+        return self.model.get_weights()
+
+    def summary(self) -> None:
+        self.model.summary()
+
+
 def greedy_digit_party_move(
-    nn: DigitParty3x3NeuralNetwork, state: DigitPartyState
+    nn: NeuralNetwork[DigitPartyState, DQNOutput], state: DigitPartyState
 ) -> DigitPartyPlacement:
-    out = nn.predict([DigitParty.to_immutable(state)])[0]
+    out = nn.predict([state])[0]
     valid_actions = np.flatnonzero(np.asarray(DigitParty.actions(state)) == VALID)
     if len(valid_actions) == 0:
         raise ValueError("No valid actions are available for Digit Party evaluation")
@@ -53,7 +149,7 @@ def greedy_digit_party_move(
 
 
 def evaluate_digit_party(
-    nn: DigitParty3x3NeuralNetwork, games: int, n: int
+    nn: NeuralNetwork[DigitPartyState, DQNOutput], games: int, n: int
 ) -> DigitPartyEvaluation:
     game = DigitParty(n=n)
     total_score = 0.0
@@ -82,24 +178,27 @@ def evaluate_digit_party(
 
 
 def digit_party_evaluation_summary(
-    nn: DigitParty3x3NeuralNetwork, games: int, n: int
-) -> str:
+    nn: NeuralNetwork[DigitPartyState, DQNOutput], games: int, n: int
+) -> EvaluationResult:
     evaluation = evaluate_digit_party(nn=nn, games=games, n=n)
-    return (
-        f"{evaluation.games} games, "
-        f"avg_pct={evaluation.average_pct:.2f}%, "
-        f"aggregate_pct={evaluation.aggregate_pct:.2f}%, "
-        f"avg_score={evaluation.average_score:.2f}/"
-        f"{evaluation.average_theoretical_max:.2f}"
+    return EvaluationResult(
+        score=evaluation.average_pct,
+        summary=(
+            f"{evaluation.games} games, "
+            f"avg_pct={evaluation.average_pct:.2f}%, "
+            f"aggregate_pct={evaluation.aggregate_pct:.2f}%, "
+            f"avg_score={evaluation.average_score:.2f}/"
+            f"{evaluation.average_theoretical_max:.2f}"
+        ),
     )
 
 
 def deep_q_3x3_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
-    nn = DigitParty3x3NeuralNetwork(
+    nn = DigitParty3x3DeepQNN(
         params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/deepq_3x3_models/"
     )
-    target_nn = DigitParty3x3NeuralNetwork(
+    target_nn = DigitParty3x3DeepQNN(
         params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/deepq_3x3_models/"
     )
     nn.summary()
@@ -135,7 +234,9 @@ def deep_q_3x3_trained_game():
 
     print(
         "Final evaluation: "
-        + digit_party_evaluation_summary(nn=nn, games=FINAL_EVALUATION_GAMES, n=3)
+        + digit_party_evaluation_summary(
+            nn=nn, games=FINAL_EVALUATION_GAMES, n=3
+        ).summary
     )
 
 
