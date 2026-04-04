@@ -147,15 +147,14 @@ class DeepQLearner(Generic[State, Immutable]):
         nn: NeuralNetwork[State, DQNOutput],
         target_nn: NeuralNetwork[State, DQNOutput],
         params: DeepQParameters,
-        memory_folder: str,
+        training_artifacts_folder: str,
         evaluator: Callable[[], EvaluationResult] | None = None,
     ) -> None:
         self.game = game
         self.predict_nn = nn
         self.target_nn = target_nn
-        self.memory: Deque[Memory] = deque([], maxlen=params.memory_size)
-        self.memory_folder = memory_folder
-        self.state_tracker_folder = f"{self.memory_folder.rstrip('/')}_trackers"
+        self.replay_memory: Deque[Memory] = deque([], maxlen=params.memory_size)
+        self.training_artifacts_folder = training_artifacts_folder
 
         self.training_episodes = params.training_episodes
         self.episodes_per_model_save = params.episodes_per_model_save
@@ -239,7 +238,7 @@ class DeepQLearner(Generic[State, Immutable]):
         )
 
     def train(self) -> None:
-        self.load_memory()
+        self.load_replay_memory()
         latest_ep = self.load_latest_model()
 
         self.steps = 0
@@ -263,7 +262,7 @@ class DeepQLearner(Generic[State, Immutable]):
                 self.predict_nn.save(f"ep_{i:07d}_model.weights.h5")
 
             if i % self.episodes_per_memory_save == 0:
-                self.save_memory(f"ep_{i:07d}_memory.pkl")
+                self.save_replay_memory(f"ep_{i:07d}_replay_memory.pkl")
 
             if (
                 self.episodes_per_stats_print > 0
@@ -362,7 +361,7 @@ class DeepQLearner(Generic[State, Immutable]):
             mem = self._freeze_transition(
                 state_snapshot, a, next_state, reward, game_end
             )
-            self.memory.append(mem)
+            self.replay_memory.append(mem)
 
             # replay memory
             if (
@@ -370,21 +369,21 @@ class DeepQLearner(Generic[State, Immutable]):
                 and self.steps % self.steps_to_train_shortterm == 0
             ):
                 self.shortterm_replay_calls += 1
-                self.replay_memory(np.asarray([mem], dtype=object))
+                self.train_on_replay_minibatch(np.asarray([mem], dtype=object))
 
             if (
                 self.steps_to_train_longterm > 0
                 and self.steps % self.steps_to_train_longterm == 0
-                and len(self.memory) > self.minibatch_size
-                and len(self.memory) > self.min_replay_size
+                and len(self.replay_memory) > self.minibatch_size
+                and len(self.replay_memory) > self.min_replay_size
             ):
                 self.longterm_replay_calls += 1
                 minibatch = self.rng.choice(
-                    np.asarray(self.memory, dtype=object),
+                    np.asarray(self.replay_memory, dtype=object),
                     size=self.minibatch_size,
                     replace=False,
                 )
-                self.replay_memory(minibatch)
+                self.train_on_replay_minibatch(minibatch)
 
             # update target network weights
             if self.steps % self.steps_per_target_update == 0:
@@ -398,7 +397,7 @@ class DeepQLearner(Generic[State, Immutable]):
             steps=episode_steps,
         )
 
-    def replay_memory(self, minibatch: NDArray) -> None:
+    def train_on_replay_minibatch(self, minibatch: NDArray) -> None:
         # minibatch is an array converted from: List[Tuple[State, Action, State, Reward, bool]]
         states = minibatch[:, 0]
         actions = minibatch[:, 1].astype(Action)
@@ -463,64 +462,81 @@ class DeepQLearner(Generic[State, Immutable]):
             self.target_nn.load(latest_model)
         return latest
 
-    def save_memory(self, memory_file: str) -> None:
-        if not os.path.exists(self.memory_folder):
-            print(f"Making directory for play memory at: {self.memory_folder}")
-            os.makedirs(self.memory_folder)
-
-        memory_path = os.path.join(self.memory_folder, memory_file)
-        with open(memory_path, "wb") as f:
-            pickle.dump(self.memory, f)
-        self.save_state_tracker(memory_file.replace("_memory.pkl", "_tracker.pkl"))
-
-    def save_state_tracker(self, tracker_file: str) -> None:
-        if not os.path.exists(self.state_tracker_folder):
-            print(
-                f"Making directory for state trackers at: {self.state_tracker_folder}"
+    @staticmethod
+    def _unique_states_file(replay_memory_file: str) -> str:
+        if replay_memory_file.endswith("_replay_memory.pkl"):
+            return replay_memory_file.replace(
+                "_replay_memory.pkl", "_unique_states.pkl"
             )
-            os.makedirs(self.state_tracker_folder)
+        raise ValueError(f"Unexpected replay memory filename: {replay_memory_file}")
 
-        tracker_path = os.path.join(self.state_tracker_folder, tracker_file)
-        with open(tracker_path, "wb") as f:
+    def save_replay_memory(self, replay_memory_file: str) -> None:
+        if not os.path.exists(self.training_artifacts_folder):
+            print(
+                "Making directory for training artifacts at:"
+                f" {self.training_artifacts_folder}"
+            )
+            os.makedirs(self.training_artifacts_folder)
+
+        replay_memory_path = os.path.join(
+            self.training_artifacts_folder, replay_memory_file
+        )
+        with open(replay_memory_path, "wb") as f:
+            pickle.dump(self.replay_memory, f)
+        self.save_unique_states(self._unique_states_file(replay_memory_file))
+
+    def save_unique_states(self, unique_states_file: str) -> None:
+        if not os.path.exists(self.training_artifacts_folder):
+            print(
+                "Making directory for training artifacts at:"
+                f" {self.training_artifacts_folder}"
+            )
+            os.makedirs(self.training_artifacts_folder)
+
+        unique_states_path = os.path.join(
+            self.training_artifacts_folder, unique_states_file
+        )
+        with open(unique_states_path, "wb") as f:
             pickle.dump(self.unique_state_tracker, f)
 
-    def load_memory(self) -> None:
-        if not os.path.isdir(self.memory_folder):
+    def load_replay_memory(self) -> None:
+        if not os.path.isdir(self.training_artifacts_folder):
             return
 
         latest = 0
-        latest_memory = None
-        for filename in os.listdir(self.memory_folder):
-            if not filename.endswith("_memory.pkl"):
+        latest_replay_memory = None
+        for filename in os.listdir(self.training_artifacts_folder):
+            if not filename.endswith("_replay_memory.pkl"):
                 continue
-            f = os.path.join(self.memory_folder, filename)
+            f = os.path.join(self.training_artifacts_folder, filename)
             if os.path.isfile(f):
                 try:
-                    i = int(filename.split("_")[1])  # ep_0001_memory.pkl
+                    i = int(filename.split("_")[1])
                 except ValueError:
-                    # any other memory
                     continue
                 if i >= latest:
                     latest = i
-                    latest_memory = f
+                    latest_replay_memory = f
 
-        if latest_memory:
-            print(f"Loading replay memory from: {latest_memory}")
-            with open(latest_memory, "rb") as file:
-                self.memory = pickle.load(file)
-            self.load_state_tracker(
-                os.path.basename(latest_memory).replace("_memory.pkl", "_tracker.pkl")
+        if latest_replay_memory:
+            print(f"Loading replay memory from: {latest_replay_memory}")
+            with open(latest_replay_memory, "rb") as file:
+                self.replay_memory = pickle.load(file)
+            self.load_unique_states(
+                self._unique_states_file(os.path.basename(latest_replay_memory))
             )
 
-    def load_state_tracker(self, tracker_file: str) -> None:
-        tracker_path = os.path.join(self.state_tracker_folder, tracker_file)
-        if not os.path.isfile(tracker_path):
+    def load_unique_states(self, unique_states_file: str) -> None:
+        unique_states_path = os.path.join(
+            self.training_artifacts_folder, unique_states_file
+        )
+        if not os.path.isfile(unique_states_path):
             print(
-                "No saved state tracker found for the latest replay memory;"
+                "No saved unique-state tracker found for the latest replay memory;"
                 " novelty tracking will restart for this session."
             )
             return
 
-        print(f"Loading state tracker from: {tracker_path}")
-        with open(tracker_path, "rb") as file:
+        print(f"Loading unique-state tracker from: {unique_states_path}")
+        with open(unique_states_path, "rb") as file:
             self.unique_state_tracker = pickle.load(file)

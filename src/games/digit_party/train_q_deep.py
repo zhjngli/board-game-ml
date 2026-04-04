@@ -227,7 +227,7 @@ def deep_q_3x3_trained_game():
             state_tracker_size_bits=16_777_216,
             state_tracker_num_hashes=7,
         ),
-        memory_folder=f"{cur_dir}/deepq_3x3_memory/",
+        training_artifacts_folder=f"{cur_dir}/deepq_3x3_artifacts/",
         evaluator=lambda: digit_party_evaluation_summary(
             nn=nn, games=TRAINING_EVALUATION_GAMES, n=3
         ),

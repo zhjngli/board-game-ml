@@ -219,12 +219,12 @@ def test_run_game_once_masks_invalid_greedy_action() -> None:
         nn=predict_nn,
         target_nn=DummyNetwork(outputs={}),
         params=build_params(),
-        memory_folder="",
+        training_artifacts_folder="",
     )
 
     learner.run_game_once()
 
-    assert learner.memory[0][1] == 0
+    assert learner.replay_memory[0][1] == 0
 
 
 def test_run_game_once_masks_invalid_random_action() -> None:
@@ -241,13 +241,13 @@ def test_run_game_once_masks_invalid_random_action() -> None:
         nn=predict_nn,
         target_nn=DummyNetwork(outputs={}),
         params=params,
-        memory_folder="",
+        training_artifacts_folder="",
     )
     learner.epsilon = 1.0
 
     learner.run_game_once()
 
-    assert learner.memory[0][1] == 0
+    assert learner.replay_memory[0][1] == 0
 
 
 def test_replay_memory_masks_invalid_next_actions() -> None:
@@ -262,14 +262,14 @@ def test_replay_memory_masks_invalid_next_actions() -> None:
         nn=predict_nn,
         target_nn=target_nn,
         params=build_params(),
-        memory_folder="",
+        training_artifacts_folder="",
     )
 
     state = DummyState(board=np.array([0, 1]), tag="start")
     next_state = DummyState(board=np.array([0, 1]), tag="next")
     minibatch = np.asarray([(state, 0, next_state, 0.0, False)], dtype=object)
 
-    learner.replay_memory(minibatch)
+    learner.train_on_replay_minibatch(minibatch)
 
     trained_output = predict_nn.training_batches[0][0][1]
     assert trained_output.policy[0] == 1.0
@@ -287,12 +287,12 @@ def test_run_game_once_stores_frozen_state_snapshots() -> None:
         nn=predict_nn,
         target_nn=DummyNetwork(outputs={}),
         params=build_params(),
-        memory_folder="",
+        training_artifacts_folder="",
     )
 
     learner.run_game_once()
 
-    state, _, next_state, _, _ = learner.memory[0]
+    state, _, next_state, _, _ = learner.replay_memory[0]
     assert int(state.board[0]) == 0
     assert int(next_state.board[0]) == 99
 
@@ -310,7 +310,7 @@ def test_run_game_once_tracks_unique_immutable_states_by_ply() -> None:
         nn=predict_nn,
         target_nn=DummyNetwork(outputs={}),
         params=build_params(),
-        memory_folder="",
+        training_artifacts_folder="",
     )
 
     learner.run_game_once()
@@ -328,26 +328,26 @@ def test_load_memory_restores_unique_state_tracker(tmp_path: Path) -> None:
             "terminal": DQNOutput(policy=np.array([0.0]), value=0.0),
         }
     )
-    memory_folder = str(tmp_path / "memory")
+    training_artifacts_folder = str(tmp_path / "artifacts")
     learner = DeepQLearner(
         game=TwoStepGame(),
         nn=predict_nn,
         target_nn=DummyNetwork(outputs={}),
         params=build_params(),
-        memory_folder=memory_folder,
+        training_artifacts_folder=training_artifacts_folder,
     )
     learner.run_game_once()
     learner.run_game_once()
-    learner.save_memory("ep_0000001_memory.pkl")
+    learner.save_replay_memory("ep_0000001_replay_memory.pkl")
 
     restored = DeepQLearner(
         game=TwoStepGame(),
         nn=predict_nn,
         target_nn=DummyNetwork(outputs={}),
         params=build_params(),
-        memory_folder=memory_folder,
+        training_artifacts_folder=training_artifacts_folder,
     )
-    restored.load_memory()
+    restored.load_replay_memory()
 
     assert restored.unique_state_count() == learner.unique_state_count()
     assert restored.unique_state_counts_by_ply() == learner.unique_state_counts_by_ply()
@@ -378,7 +378,7 @@ def test_train_calls_evaluator_on_schedule() -> None:
         nn=predict_nn,
         target_nn=DummyNetwork(outputs={}),
         params=params,
-        memory_folder="",
+        training_artifacts_folder="",
         evaluator=evaluator,
     )
 
