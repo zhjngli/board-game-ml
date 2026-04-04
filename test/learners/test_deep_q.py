@@ -137,6 +137,50 @@ class InPlaceMutationGame(Game[DummyState, str]):
         return [a]
 
 
+class TwoStepGame(Game[DummyState, str]):
+    def __init__(self) -> None:
+        self._state = DummyState(board=np.array([0, 0]), tag="start")
+
+    def reset(self) -> None:
+        self._state = DummyState(board=np.array([0, 0]), tag="start")
+
+    def state(self) -> DummyState:
+        return self._state
+
+    @staticmethod
+    def to_immutable(state: DummyState) -> str:
+        return state.tag
+
+    def num_actions(self) -> int:
+        return 1
+
+    @staticmethod
+    def actions(state: DummyState) -> List[ActionStatus]:
+        return [VALID]
+
+    @staticmethod
+    def apply(state: DummyState, action: int) -> DummyState:
+        if state.tag == "start":
+            return DummyState(board=np.array([1, 0]), tag="mid")
+        return DummyState(board=np.array([1, 1]), tag="terminal", finished=True)
+
+    @staticmethod
+    def check_finished(state: DummyState) -> bool:
+        return state.finished
+
+    @staticmethod
+    def calculate_reward(state: DummyState) -> float:
+        return 0.0
+
+    @staticmethod
+    def orient_state(state: DummyState) -> DummyState:
+        return state
+
+    @staticmethod
+    def symmetries_of(a: np.ndarray) -> List[np.ndarray]:
+        return [a]
+
+
 def build_params() -> DeepQParameters:
     return DeepQParameters(
         alpha=1.0,
@@ -248,6 +292,29 @@ def test_run_game_once_stores_frozen_state_snapshots() -> None:
     state, _, next_state, _, _ = learner.memory[0]
     assert int(state.board[0]) == 0
     assert int(next_state.board[0]) == 99
+
+
+def test_run_game_once_tracks_unique_immutable_states_by_ply() -> None:
+    predict_nn = DummyNetwork(
+        outputs={
+            "start": DQNOutput(policy=np.array([1.0]), value=0.0),
+            "mid": DQNOutput(policy=np.array([1.0]), value=0.0),
+            "terminal": DQNOutput(policy=np.array([0.0]), value=0.0),
+        }
+    )
+    learner = DeepQLearner(
+        game=TwoStepGame(),
+        nn=predict_nn,
+        target_nn=DummyNetwork(outputs={}),
+        params=build_params(),
+        memory_folder="",
+    )
+
+    learner.run_game_once()
+    learner.run_game_once()
+
+    assert learner.unique_state_count() == 2
+    assert learner.unique_state_counts_by_ply() == {0: 1, 1: 1}
 
 
 def test_train_calls_evaluator_on_schedule() -> None:

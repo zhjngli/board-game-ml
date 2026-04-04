@@ -54,6 +54,26 @@ class EvaluationResult(NamedTuple):
     summary: str
 
 
+class UniqueStateTracker(Generic[Immutable]):
+    def __init__(self) -> None:
+        self.states_seen: set[Immutable] = set()
+        self.states_seen_by_ply: dict[int, set[Immutable]] = {}
+
+    def observe(self, state: Immutable, ply: int) -> None:
+        self.states_seen.add(state)
+        if ply not in self.states_seen_by_ply:
+            self.states_seen_by_ply[ply] = set()
+        self.states_seen_by_ply[ply].add(state)
+
+    def total_unique_states(self) -> int:
+        return len(self.states_seen)
+
+    def unique_states_by_ply(self) -> dict[int, int]:
+        return {
+            ply: len(states) for ply, states in sorted(self.states_seen_by_ply.items())
+        }
+
+
 class DeepQLearner(Generic[State, Immutable]):
     def __init__(
         self,
@@ -99,6 +119,7 @@ class DeepQLearner(Generic[State, Immutable]):
         self.target_syncs = 0
         self.evaluator = evaluator
         self.best_evaluation_score: float | None = None
+        self.unique_state_tracker = UniqueStateTracker[Immutable]()
 
     def _valid_actions(self, state: State) -> NDArray[np.int_]:
         action_statuses = np.asarray(self.game.actions(state))
@@ -120,6 +141,24 @@ class DeepQLearner(Generic[State, Immutable]):
             done,
         )
 
+    def _record_state_visit(self, state: State, ply: int) -> None:
+        self.unique_state_tracker.observe(self.game.to_immutable(state), ply)
+
+    def unique_state_count(self) -> int:
+        return self.unique_state_tracker.total_unique_states()
+
+    def unique_state_counts_by_ply(self) -> dict[int, int]:
+        return self.unique_state_tracker.unique_states_by_ply()
+
+    @staticmethod
+    def _format_unique_states_by_ply(
+        counts: dict[int, int], previous_counts: dict[int, int]
+    ) -> str:
+        parts = []
+        for ply, count in counts.items():
+            parts.append(f"{ply}:{count}(+{count - previous_counts.get(ply, 0)})")
+        return "[" + ", ".join(parts) + "]"
+
     def calculate_epsilon(self, episode: int) -> float:
         return self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(
             -self.epsilon_decay * episode
@@ -137,6 +176,8 @@ class DeepQLearner(Generic[State, Immutable]):
         last_shortterm_replays = self.shortterm_replay_calls
         last_longterm_replays = self.longterm_replay_calls
         last_target_syncs = self.target_syncs
+        last_unique_states = self.unique_state_count()
+        last_unique_states_by_ply = self.unique_state_counts_by_ply()
         for i in range(latest_ep + 1, self.training_episodes + 1):
             episode_stats = self.run_game_once()
             report_rewards.append(float(episode_stats.final_reward))
@@ -154,6 +195,8 @@ class DeepQLearner(Generic[State, Immutable]):
                 self.episodes_per_stats_print > 0
                 and i % self.episodes_per_stats_print == 0
             ):
+                current_unique_states = self.unique_state_count()
+                current_unique_states_by_ply = self.unique_state_counts_by_ply()
                 print(
                     "Episode"
                     f" {i}: epsilon={self.epsilon:.4f},"
@@ -162,7 +205,15 @@ class DeepQLearner(Generic[State, Immutable]):
                     f" invalid_actions={self.invalid_action_count - last_invalid_actions},"
                     f" short_replays={self.shortterm_replay_calls - last_shortterm_replays},"
                     f" long_replays={self.longterm_replay_calls - last_longterm_replays},"
-                    f" target_syncs={self.target_syncs - last_target_syncs}"
+                    f" target_syncs={self.target_syncs - last_target_syncs},"
+                    f" unique_states={current_unique_states}"
+                    f"(+{current_unique_states - last_unique_states})"
+                )
+                print(
+                    "  unique_states_by_ply="
+                    + self._format_unique_states_by_ply(
+                        current_unique_states_by_ply, last_unique_states_by_ply
+                    )
                 )
                 report_rewards = []
                 report_steps = 0
@@ -170,6 +221,8 @@ class DeepQLearner(Generic[State, Immutable]):
                 last_shortterm_replays = self.shortterm_replay_calls
                 last_longterm_replays = self.longterm_replay_calls
                 last_target_syncs = self.target_syncs
+                last_unique_states = current_unique_states
+                last_unique_states_by_ply = current_unique_states_by_ply
 
             if (
                 self.evaluator is not None
@@ -192,6 +245,7 @@ class DeepQLearner(Generic[State, Immutable]):
         episode_steps = 0
 
         while not self.game.check_finished(state):
+            self._record_state_visit(state, ply=episode_steps)
             self.steps += 1
             episode_steps += 1
 
