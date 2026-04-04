@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List
 
 import numpy as np
@@ -200,6 +201,8 @@ def build_params() -> DeepQParameters:
         episodes_per_memory_save=1,
         episodes_per_stats_print=0,
         episodes_per_evaluation=0,
+        state_tracker_size_bits=4_096,
+        state_tracker_num_hashes=3,
     )
 
 
@@ -315,6 +318,39 @@ def test_run_game_once_tracks_unique_immutable_states_by_ply() -> None:
 
     assert learner.unique_state_count() == 2
     assert learner.unique_state_counts_by_ply() == {0: 1, 1: 1}
+
+
+def test_load_memory_restores_unique_state_tracker(tmp_path: Path) -> None:
+    predict_nn = DummyNetwork(
+        outputs={
+            "start": DQNOutput(policy=np.array([1.0]), value=0.0),
+            "mid": DQNOutput(policy=np.array([1.0]), value=0.0),
+            "terminal": DQNOutput(policy=np.array([0.0]), value=0.0),
+        }
+    )
+    memory_folder = str(tmp_path / "memory")
+    learner = DeepQLearner(
+        game=TwoStepGame(),
+        nn=predict_nn,
+        target_nn=DummyNetwork(outputs={}),
+        params=build_params(),
+        memory_folder=memory_folder,
+    )
+    learner.run_game_once()
+    learner.run_game_once()
+    learner.save_memory("ep_0000001_memory.pkl")
+
+    restored = DeepQLearner(
+        game=TwoStepGame(),
+        nn=predict_nn,
+        target_nn=DummyNetwork(outputs={}),
+        params=build_params(),
+        memory_folder=memory_folder,
+    )
+    restored.load_memory()
+
+    assert restored.unique_state_count() == learner.unique_state_count()
+    assert restored.unique_state_counts_by_ply() == learner.unique_state_counts_by_ply()
 
 
 def test_train_calls_evaluator_on_schedule() -> None:

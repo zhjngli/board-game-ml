@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import os
 import pickle
 from collections import deque
@@ -29,6 +30,8 @@ class DeepQParameters(NamedTuple):
     episodes_per_memory_save: int
     episodes_per_stats_print: int
     episodes_per_evaluation: int
+    state_tracker_size_bits: int
+    state_tracker_num_hashes: int
 
 
 Policy = NDArray  # TODO: one dimensional NDArray of arbitrary length
@@ -54,23 +57,86 @@ class EvaluationResult(NamedTuple):
     summary: str
 
 
+# The unique-state tracker is only for observability. We intentionally use Bloom
+# filters instead of exact sets so the persisted tracker stays bounded in size.
+# The tradeoff is occasional false positives, which makes the counts approximate
+# lower bounds on how many observable states we have seen.
+class BloomFilter:
+    def __init__(self, size_bits: int, num_hashes: int) -> None:
+        self.size_bits = size_bits
+        self.num_hashes = num_hashes
+        self.bits = bytearray((size_bits + 7) // 8)
+
+    @staticmethod
+    def _digest(payload: bytes) -> tuple[int, int]:
+        # Bloom filters need multiple bit indexes per item. We derive those
+        # indexes from a single stable blake2b digest by splitting the 128-bit
+        # digest into two 64-bit values and then using double hashing below.
+        digest = hashlib.blake2b(payload, digest_size=16).digest()
+        h1 = int.from_bytes(digest[:8], byteorder="big", signed=False)
+        h2 = int.from_bytes(digest[8:], byteorder="big", signed=False)
+        if h2 == 0:
+            # A zero step would collapse every derived Bloom-filter index onto
+            # the same bit position. We swap in a fixed odd 64-bit constant
+            # (the golden-ratio hashing constant) so persisted tracker files
+            # stay deterministic while still spreading indexes out well.
+            h2 = 0x9E3779B97F4A7C15
+        return h1, h2
+
+    def _indexes(self, payload: bytes) -> list[int]:
+        h1, h2 = self._digest(payload)
+        return [int((h1 + i * h2) % self.size_bits) for i in range(self.num_hashes)]
+
+    def probably_contains(self, payload: bytes) -> bool:
+        for index in self._indexes(payload):
+            if not (self.bits[index // 8] & (1 << (index % 8))):
+                return False
+        return True
+
+    def add(self, payload: bytes) -> None:
+        for index in self._indexes(payload):
+            self.bits[index // 8] |= 1 << (index % 8)
+
+    def add_if_new(self, payload: bytes) -> bool:
+        is_new = not self.probably_contains(payload)
+        self.add(payload)
+        return is_new
+
+
 class UniqueStateTracker(Generic[Immutable]):
-    def __init__(self) -> None:
-        self.states_seen: set[Immutable] = set()
-        self.states_seen_by_ply: dict[int, set[Immutable]] = {}
+    def __init__(self, size_bits: int, num_hashes: int) -> None:
+        self.size_bits = size_bits
+        self.num_hashes = num_hashes
+        self.states_seen = BloomFilter(size_bits=size_bits, num_hashes=num_hashes)
+        self.states_seen_count = 0
+        self.states_seen_by_ply: dict[int, BloomFilter] = {}
+        self.states_seen_count_by_ply: dict[int, int] = {}
+
+    # We use a stable digest of the game's immutable state rather than Python's
+    # built-in hash() so tracker files can be reused across processes.
+    @staticmethod
+    def _payload(state: Immutable) -> bytes:
+        return pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL)
 
     def observe(self, state: Immutable, ply: int) -> None:
-        self.states_seen.add(state)
+        payload = self._payload(state)
+        if self.states_seen.add_if_new(payload):
+            self.states_seen_count += 1
+
         if ply not in self.states_seen_by_ply:
-            self.states_seen_by_ply[ply] = set()
-        self.states_seen_by_ply[ply].add(state)
+            self.states_seen_by_ply[ply] = BloomFilter(
+                size_bits=self.size_bits, num_hashes=self.num_hashes
+            )
+            self.states_seen_count_by_ply[ply] = 0
+        if self.states_seen_by_ply[ply].add_if_new(payload):
+            self.states_seen_count_by_ply[ply] += 1
 
     def total_unique_states(self) -> int:
-        return len(self.states_seen)
+        return self.states_seen_count
 
     def unique_states_by_ply(self) -> dict[int, int]:
         return {
-            ply: len(states) for ply, states in sorted(self.states_seen_by_ply.items())
+            ply: count for ply, count in sorted(self.states_seen_count_by_ply.items())
         }
 
 
@@ -89,12 +155,15 @@ class DeepQLearner(Generic[State, Immutable]):
         self.target_nn = target_nn
         self.memory: Deque[Memory] = deque([], maxlen=params.memory_size)
         self.memory_folder = memory_folder
+        self.state_tracker_folder = f"{self.memory_folder.rstrip('/')}_trackers"
 
         self.training_episodes = params.training_episodes
         self.episodes_per_model_save = params.episodes_per_model_save
         self.episodes_per_memory_save = params.episodes_per_memory_save
         self.episodes_per_stats_print = params.episodes_per_stats_print
         self.episodes_per_evaluation = params.episodes_per_evaluation
+        self.state_tracker_size_bits = params.state_tracker_size_bits
+        self.state_tracker_num_hashes = params.state_tracker_num_hashes
 
         self.min_replay_size = params.min_replay_size
         self.minibatch_size = params.minibatch_size
@@ -119,7 +188,10 @@ class DeepQLearner(Generic[State, Immutable]):
         self.target_syncs = 0
         self.evaluator = evaluator
         self.best_evaluation_score: float | None = None
-        self.unique_state_tracker = UniqueStateTracker[Immutable]()
+        self.unique_state_tracker = UniqueStateTracker[Immutable](
+            size_bits=self.state_tracker_size_bits,
+            num_hashes=self.state_tracker_num_hashes,
+        )
 
     def _valid_actions(self, state: State) -> NDArray[np.int_]:
         action_statuses = np.asarray(self.game.actions(state))
@@ -399,6 +471,18 @@ class DeepQLearner(Generic[State, Immutable]):
         memory_path = os.path.join(self.memory_folder, memory_file)
         with open(memory_path, "wb") as f:
             pickle.dump(self.memory, f)
+        self.save_state_tracker(memory_file.replace("_memory.pkl", "_tracker.pkl"))
+
+    def save_state_tracker(self, tracker_file: str) -> None:
+        if not os.path.exists(self.state_tracker_folder):
+            print(
+                f"Making directory for state trackers at: {self.state_tracker_folder}"
+            )
+            os.makedirs(self.state_tracker_folder)
+
+        tracker_path = os.path.join(self.state_tracker_folder, tracker_file)
+        with open(tracker_path, "wb") as f:
+            pickle.dump(self.unique_state_tracker, f)
 
     def load_memory(self) -> None:
         if not os.path.isdir(self.memory_folder):
@@ -407,6 +491,8 @@ class DeepQLearner(Generic[State, Immutable]):
         latest = 0
         latest_memory = None
         for filename in os.listdir(self.memory_folder):
+            if not filename.endswith("_memory.pkl"):
+                continue
             f = os.path.join(self.memory_folder, filename)
             if os.path.isfile(f):
                 try:
@@ -422,3 +508,19 @@ class DeepQLearner(Generic[State, Immutable]):
             print(f"Loading replay memory from: {latest_memory}")
             with open(latest_memory, "rb") as file:
                 self.memory = pickle.load(file)
+            self.load_state_tracker(
+                os.path.basename(latest_memory).replace("_memory.pkl", "_tracker.pkl")
+            )
+
+    def load_state_tracker(self, tracker_file: str) -> None:
+        tracker_path = os.path.join(self.state_tracker_folder, tracker_file)
+        if not os.path.isfile(tracker_path):
+            print(
+                "No saved state tracker found for the latest replay memory;"
+                " novelty tracking will restart for this session."
+            )
+            return
+
+        print(f"Loading state tracker from: {tracker_path}")
+        with open(tracker_path, "rb") as file:
+            self.unique_state_tracker = pickle.load(file)
