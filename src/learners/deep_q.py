@@ -151,12 +151,14 @@ class DeepQLearner(Generic[State, Immutable]):
         return self.unique_state_tracker.unique_states_by_ply()
 
     @staticmethod
-    def _format_unique_states_by_ply(
-        counts: dict[int, int], previous_counts: dict[int, int]
+    def _format_novelty_rate_by_ply(
+        counts: dict[int, int], previous_counts: dict[int, int], episodes: int
     ) -> str:
         parts = []
         for ply, count in counts.items():
-            parts.append(f"{ply}:{count}(+{count - previous_counts.get(ply, 0)})")
+            new_states = count - previous_counts.get(ply, 0)
+            novelty_rate = 100 * new_states / episodes if episodes > 0 else 0.0
+            parts.append(f"{ply}:{new_states}/{episodes} ({novelty_rate:.1f}%)")
         return "[" + ", ".join(parts) + "]"
 
     def calculate_epsilon(self, episode: int) -> float:
@@ -195,13 +197,14 @@ class DeepQLearner(Generic[State, Immutable]):
                 self.episodes_per_stats_print > 0
                 and i % self.episodes_per_stats_print == 0
             ):
+                episodes_in_window = len(report_rewards)
                 current_unique_states = self.unique_state_count()
                 current_unique_states_by_ply = self.unique_state_counts_by_ply()
                 print(
                     "Episode"
                     f" {i}: epsilon={self.epsilon:.4f},"
                     f" avg_final_reward={np.mean(report_rewards):.4f},"
-                    f" avg_steps={report_steps / len(report_rewards):.2f},"
+                    f" avg_steps={report_steps / episodes_in_window:.2f},"
                     f" invalid_actions={self.invalid_action_count - last_invalid_actions},"
                     f" short_replays={self.shortterm_replay_calls - last_shortterm_replays},"
                     f" long_replays={self.longterm_replay_calls - last_longterm_replays},"
@@ -210,9 +213,11 @@ class DeepQLearner(Generic[State, Immutable]):
                     f"(+{current_unique_states - last_unique_states})"
                 )
                 print(
-                    "  unique_states_by_ply="
-                    + self._format_unique_states_by_ply(
-                        current_unique_states_by_ply, last_unique_states_by_ply
+                    "  novelty_rate_by_ply="
+                    + self._format_novelty_rate_by_ply(
+                        current_unique_states_by_ply,
+                        last_unique_states_by_ply,
+                        episodes_in_window,
                     )
                 )
                 report_rewards = []

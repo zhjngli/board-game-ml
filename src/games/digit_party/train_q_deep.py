@@ -35,7 +35,7 @@ DQN_3X3_NN_PARAMS = DP3NNParams(
 )
 
 TRAINING_EVALUATION_GAMES = 500
-TRAINING_EVALUATION_INTERVAL = 1000
+TRAINING_EVALUATION_INTERVAL = 2500
 FINAL_EVALUATION_GAMES = 1000
 
 
@@ -209,20 +209,20 @@ def deep_q_3x3_trained_game():
         DeepQParameters(
             alpha=0.1,
             gamma=0.9,
-            min_epsilon=0.01,
+            min_epsilon=0.05,
             max_epsilon=1,
-            epsilon_decay=0.0005,
+            epsilon_decay=0.0001,
             valid_action_reward=0.01,
-            memory_size=20_000,
-            min_replay_size=512,
+            memory_size=100_000,
+            min_replay_size=5_000,
             minibatch_size=64,
             steps_to_train_longterm=4,
             steps_to_train_shortterm=0,
             steps_per_target_update=250,
-            training_episodes=10_000,
-            episodes_per_model_save=1_000,
-            episodes_per_memory_save=1_000,
-            episodes_per_stats_print=100,
+            training_episodes=100_000,
+            episodes_per_model_save=5_000,
+            episodes_per_memory_save=5_000,
+            episodes_per_stats_print=500,
             episodes_per_evaluation=TRAINING_EVALUATION_INTERVAL,
         ),
         memory_folder=f"{cur_dir}/deepq_3x3_memory/",
