@@ -2,6 +2,7 @@ import copy
 import hashlib
 import os
 import pickle
+import time
 from collections import deque
 from typing import Callable, Deque, Generic, List, NamedTuple, Tuple
 
@@ -237,12 +238,24 @@ class DeepQLearner(Generic[State, Immutable]):
             -self.epsilon_decay * episode
         )
 
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        minutes, rem = divmod(seconds, 60)
+        if minutes < 60:
+            return f"{int(minutes)}m {rem:.1f}s"
+        hours, minutes = divmod(minutes, 60)
+        return f"{int(hours)}h {int(minutes)}m {rem:.1f}s"
+
     def train(self) -> None:
         self.load_replay_memory()
         latest_ep = self.load_latest_model()
 
         self.steps = 0
         self.epsilon = self.calculate_epsilon(latest_ep)
+        training_start = time.perf_counter()
+        last_report_time = training_start
         report_rewards: List[float] = []
         report_steps = 0
         last_invalid_actions = self.invalid_action_count
@@ -268,6 +281,7 @@ class DeepQLearner(Generic[State, Immutable]):
                 self.episodes_per_stats_print > 0
                 and i % self.episodes_per_stats_print == 0
             ):
+                now = time.perf_counter()
                 episodes_in_window = len(report_rewards)
                 current_unique_states = self.unique_state_count()
                 current_unique_states_by_ply = self.unique_state_counts_by_ply()
@@ -280,6 +294,8 @@ class DeepQLearner(Generic[State, Immutable]):
                     f" short_replays={self.shortterm_replay_calls - last_shortterm_replays},"
                     f" long_replays={self.longterm_replay_calls - last_longterm_replays},"
                     f" target_syncs={self.target_syncs - last_target_syncs},"
+                    f" window_time={self._format_duration(now - last_report_time)},"
+                    f" total_time={self._format_duration(now - training_start)},"
                     f" unique_states={current_unique_states}"
                     f"(+{current_unique_states - last_unique_states})"
                 )
@@ -299,14 +315,19 @@ class DeepQLearner(Generic[State, Immutable]):
                 last_target_syncs = self.target_syncs
                 last_unique_states = current_unique_states
                 last_unique_states_by_ply = current_unique_states_by_ply
+                last_report_time = now
 
             if (
                 self.evaluator is not None
                 and self.episodes_per_evaluation > 0
                 and i % self.episodes_per_evaluation == 0
             ):
+                evaluation_start = time.perf_counter()
                 evaluation = self.evaluator()
-                print(f"Evaluation after episode {i}: {evaluation.summary}")
+                print(
+                    f"Evaluation after episode {i}: {evaluation.summary}, "
+                    f"eval_time={self._format_duration(time.perf_counter() - evaluation_start)}"
+                )
                 if (
                     self.best_evaluation_score is None
                     or evaluation.score > self.best_evaluation_score
