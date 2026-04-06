@@ -1,5 +1,6 @@
 import os
 import pickle
+import time
 from abc import ABC
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -103,6 +104,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         pit_history: List[Tuple[int, bool, int, int, int, float]] = []
         for i in range(last_ep + 1, self.training_episodes):
+            episode_start = time.perf_counter()
             print(f"\n{'='*60}")
             print(f"Episode {i}/{self.training_episodes - 1}")
             print(f"{'='*60}")
@@ -111,6 +113,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             print(
                 f"Self-play: {self.training_games_per_episode} games with {self.thread_max_workers} threads..."
             )
+            self_play_start = time.perf_counter()
             self_play_data: Deque[Tuple[NDArray, A0NNOutput]] = deque(
                 [], maxlen=self.training_queue_length
             )
@@ -121,8 +124,13 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 ]
                 for future in futures:
                     self_play_data.extend(future.result())
+            self_play_seconds = time.perf_counter() - self_play_start
 
-            print(f"Self-play generated {len(self_play_data)} training examples")
+            print(
+                f"Self-play generated {len(self_play_data)} training examples"
+                f" in {self._format_duration(self_play_seconds)}"
+                f" ({self.training_games_per_episode / max(self_play_seconds, 1e-9):.2f} games/s)"
+            )
             self.training_history.append(self_play_data)
 
             if len(self.training_history) > self.training_hist_max_len:
@@ -145,6 +153,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 d for game_data in self.training_history for d in game_data
             ]
             successful_train = False
+            nn_train_start = time.perf_counter()
             while not successful_train:
                 try:
                     # shuffle(training_data)  # can shuffle in nn.train()
@@ -152,11 +161,24 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                     successful_train = True
                 except Exception as e:
                     print(f"Failed to train with error {e}, retrying...")
+            nn_train_seconds = time.perf_counter() - nn_train_start
+            print(
+                f"Neural network training took {self._format_duration(nn_train_seconds)}"
+            )
 
             # if model is good enough, keep it
             print(f"\nPitting new model vs previous ({self.pit_games} games)...")
+            pit_start = time.perf_counter()
             accepted, wins, losses, draws, win_rate = self.pit()
+            pit_seconds = time.perf_counter() - pit_start
             pit_history.append((i, accepted, wins, losses, draws, win_rate))
+            print(
+                "Episode timing:"
+                f" self_play={self._format_duration(self_play_seconds)}"
+                f" | nn_train={self._format_duration(nn_train_seconds)}"
+                f" | pit={self._format_duration(pit_seconds)}"
+                f" | total={self._format_duration(time.perf_counter() - episode_start)}"
+            )
 
             if accepted:
                 print(f"New model ACCEPTED — saving as ep_{i:07d} and best_model")
@@ -173,6 +195,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         print(f"{'='*60}")
 
     def pit(self) -> Tuple[bool, int, int, int, float]:
+        pit_start = time.perf_counter()
         prev_mtcs = MonteCarloTreeSearch(
             self.create_game(), self.pn, self.eval_mcts_params
         )
@@ -223,9 +246,12 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         # candidate becomes p1 after the switch
         win_rate = p1wins / (p1wins + p2wins) if (p1wins + p2wins) > 0 else 0.0
         accepted = p1wins + p2wins != 0 and win_rate > self.pit_threshold
+        pit_seconds = time.perf_counter() - pit_start
         print(
             f"Pit results: new model {p1wins}W / {p2wins}L / {draws}D"
             f" — win rate {win_rate:.1%} (threshold {self.pit_threshold:.0%})"
+            f" | time {self._format_duration(pit_seconds)}"
+            f" | avg_game {pit_seconds / max(self.pit_games, 1):.2f}s"
         )
         return accepted, p1wins, p2wins, draws, win_rate
 
@@ -266,6 +292,18 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         print(
             f"Accept rate: {_accept_rate(last_10)}  |  Avg win rate: {'  |  '.join(parts)}"
         )
+
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+
+        minutes, rem_seconds = divmod(seconds, 60)
+        if minutes < 60:
+            return f"{int(minutes)}m {rem_seconds:.1f}s"
+
+        hours, rem_minutes = divmod(minutes, 60)
+        return f"{int(hours)}h {int(rem_minutes)}m {rem_seconds:.1f}s"
 
     def save_training_history(self, file: str) -> None:
         if not os.path.exists(self.training_examples_folder):
