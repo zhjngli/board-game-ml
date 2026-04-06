@@ -219,7 +219,7 @@ def deep_q_3x3_trained_game():
             steps_to_train_longterm=4,
             steps_to_train_shortterm=0,
             steps_per_target_update=250,
-            training_episodes=100_000,
+            training_episodes=200_000,
             episodes_per_model_save=5_000,
             episodes_per_memory_save=5_000,
             episodes_per_stats_print=500,
