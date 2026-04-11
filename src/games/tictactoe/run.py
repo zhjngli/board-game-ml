@@ -31,6 +31,7 @@ from games.tictactoe.tictactoe import (
     tile_char,
 )
 from learners.alpha_zero.alpha_zero import A0Parameters, AlphaZero
+from learners.alpha_zero.artifacts import AlphaZeroTrainingHistoryManager
 from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
@@ -562,11 +563,11 @@ def bayesian_optimization():
         model = TTTNeuralNetwork(
             params=nn_params, model_folder=f"{cur_dir}/opt_models/"
         )
-        with open(
-            f"{cur_dir}/a0_training_examples/training_examples_0000099.pkl", "rb"
-        ) as file:
-            training_examples = pickle.load(file)
-
+        training_examples = (
+            AlphaZeroTrainingHistoryManager.load_history_data_from_folder(
+                f"{cur_dir}/a0_training_examples/"
+            )
+        )
         training_data = [d for game_data in training_examples for d in game_data]
         inputs, outputs = list(zip(*training_data))
         input_boards = np.asarray([input.board for input in inputs])
