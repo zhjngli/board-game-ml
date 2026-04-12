@@ -22,7 +22,7 @@ from sklearn.model_selection import train_test_split  # type: ignore
 from tqdm import tqdm
 from typing_extensions import override
 
-from games.game import P1, P2
+from games.game import P1, P2, NNInput
 from games.tictactoe.tictactoe import (
     Empty,
     TicTacToe,
@@ -31,11 +31,12 @@ from games.tictactoe.tictactoe import (
     tile_char,
 )
 from learners.alpha_zero.alpha_zero import A0Parameters, AlphaZero
+from learners.alpha_zero.artifacts import AlphaZeroTrainingHistoryManager
 from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
 )
-from learners.alpha_zero.types import A0NNInput, A0NNOutput
+from learners.alpha_zero.types import A0NNOutput
 from learners.monte_carlo import MonteCarloLearner
 from learners.q import SimpleQLearner
 from learners.trainer import Trainer
@@ -408,7 +409,7 @@ class TTTNNParams(NamedTuple):
     dropout_rate: float
 
 
-class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
+class TTTNeuralNetwork(NeuralNetwork[NNInput, A0NNOutput]):
     def __init__(self, params: TTTNNParams, model_folder: str) -> None:
         super().__init__(model_folder)
         self.params = params
@@ -456,11 +457,14 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
             metrics={"pi": ["accuracy", "categorical_crossentropy"], "v": ["mse"]},
         )
 
-    def train(self, data: List[Tuple[A0NNInput, A0NNOutput]]) -> None:
-        inputs: List[A0NNInput]
-        outputs: List[A0NNOutput]
+    def summary(self) -> None:
+        self.model.summary()
+
+    def train(self, data: List[Tuple[NNInput, A0NNOutput]]) -> None:
         inputs, outputs = list(zip(*data))
-        input_boards = np.asarray([input.board for input in inputs])
+        input_boards = np.asarray(
+            [i if isinstance(i, np.ndarray) else i.board for i in inputs]  # type: ignore[attr-defined]  # backward compat: old .pkl files store A0NNInput(board=...)
+        )
         target_pis = np.asarray([output.policy for output in outputs])
         target_vs = np.asarray([output.value for output in outputs])
         self.model.fit(
@@ -471,9 +475,16 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
             shuffle=True,
         )
 
-    def predict(self, inputs: List[A0NNInput]) -> List[A0NNOutput]:
-        boards = np.asarray([i.board for i in inputs])
-        pis, vs = self.model.predict(boards, verbose=0)
+    def predict(self, inputs: List[NNInput]) -> List[A0NNOutput]:
+        boards = np.asarray(
+            [i if isinstance(i, np.ndarray) else i.board for i in inputs]  # type: ignore[attr-defined]  # backward compat: old .pkl files store A0NNInput(board=...)
+        )
+        # Use direct model call instead of model.predict() for thread safety —
+        # predict() has internal batching state that races with BatchNormalization
+        # when called from multiple threads during self-play.
+        result = self.model(boards, training=False)
+        pis = result[0].numpy()
+        vs = result[1].numpy()
         return [A0NNOutput(policy=pi, value=v) for pi, v in zip(pis, vs)]
 
     def save(self, file: str) -> None:
@@ -492,9 +503,6 @@ class TTTNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
 
     def get_weights(self):
         return self.model.get_weights()
-
-    def summary(self) -> None:
-        self.model.summary()
 
 
 orig_nn_params: TTTNNParams = TTTNNParams(
@@ -555,11 +563,11 @@ def bayesian_optimization():
         model = TTTNeuralNetwork(
             params=nn_params, model_folder=f"{cur_dir}/opt_models/"
         )
-        with open(
-            f"{cur_dir}/a0_training_examples/training_examples_0000099.pkl", "rb"
-        ) as file:
-            training_examples = pickle.load(file)
-
+        training_examples = (
+            AlphaZeroTrainingHistoryManager.load_history_data_from_folder(
+                f"{cur_dir}/a0_training_examples/"
+            )
+        )
         training_data = [d for game_data in training_examples for d in game_data]
         inputs, outputs = list(zip(*training_data))
         input_boards = np.asarray([input.board for input in inputs])
@@ -649,8 +657,9 @@ def alpha_zero_trained_game():
             training_queue_length=10000,
             training_hist_max_len=20,
             thread_max_workers=8,
+            training_mcts_params=training_mcts_params,
+            eval_mcts_params=mcts_params,
         ),
-        training_mcts_params,
         training_examples_folder=f"{cur_dir}/a0_training_examples/",
     )
     a0.train()

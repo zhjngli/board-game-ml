@@ -228,17 +228,13 @@ def deep_q_3x3_trained_game():
             state_tracker_num_hashes=7,
         ),
         training_artifacts_folder=f"{cur_dir}/{ARTIFACTS_FOLDER}/",
-        evaluator=lambda: digit_party_evaluation_summary(
-            nn=nn, games=500, n=3
-        ),
+        evaluator=lambda: digit_party_evaluation_summary(nn=nn, games=500, n=3),
     )
     deepq.train()
 
     print(
         "Final evaluation: "
-        + digit_party_evaluation_summary(
-            nn=nn, games=1000, n=3
-        ).summary
+        + digit_party_evaluation_summary(nn=nn, games=1000, n=3).summary
     )
 
 
@@ -249,9 +245,7 @@ def best_model_game(games: int = 1000) -> None:
     if not pathlib.Path(model_file).exists():
         raise FileNotFoundError(f"Could not find trained best model at {model_file}")
 
-    nn = DigitParty3x3DeepQNN(
-        params=DQN_3X3_NN_PARAMS, model_folder=f"{model_folder}/"
-    )
+    nn = DigitParty3x3DeepQNN(params=DQN_3X3_NN_PARAMS, model_folder=f"{model_folder}/")
     nn.load(model_file)
     print(f"Loaded best model from: {model_file}")
     computer_game(

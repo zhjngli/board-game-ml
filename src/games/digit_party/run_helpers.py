@@ -114,7 +114,7 @@ def computer_game(
     print(f"mode: {mode:.2f}%")
 
     plt.figure(figsize=(12, 6))
-    bin_edges = np.arange(0, 102, 2)
+    bin_edges = np.arange(0, 102, 2, dtype=float).tolist()
     plt.hist(df["percentages"], bins=bin_edges)
     plt.xticks(range(0, 101, 2))
     plt.xlim(0, 100)

@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
 from collections.abc import Hashable
-from typing import Generic, List, Literal, TypeVar
+from typing import Generic, List, Literal, Tuple, TypeVar
 
 from numpy.typing import NDArray
 
 Board = NDArray
+# Defined at the game level (not in learners) because each game decides what
+# the neural network sees — e.g. just the board for TTT, or board + active
+# nonant mask for UTTT.  Learners consume this type without constraining shape.
+NNInput = NDArray
 Player = Literal[1, -1]
 P1: Player = 1
 P2: Player = -1
@@ -115,8 +119,20 @@ class Game(ABC, Generic[State, Immutable]):
 
     @staticmethod
     @abstractmethod
-    def symmetries_of(a: NDArray) -> List[NDArray]:
+    def to_nn_input(state: State) -> NNInput:
         """
-        List the symmetries of the given board or policy.
+        Convert a game state to the NN input tensor.
+        Each game defines what the NN sees (e.g., board only, board + active_nonant mask).
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def training_symmetries(
+        nn_input: NNInput, policy: NDArray
+    ) -> List[Tuple[NNInput, NDArray]]:
+        """
+        Return paired (nn_input, policy) symmetries for training data augmentation.
+        MUST include the identity (un-transformed) pair.
         """
         pass

@@ -348,8 +348,6 @@ class DeepQLearner(Generic[State, Immutable]):
 
             score = self.game.calculate_reward(state)
             state_snapshot = copy.deepcopy(state)
-            # print(f"state:\n{state.board}")
-            # print(f"next: {state.next}")  # type: ignore
 
             # epsilon greedy over legal actions only
             valid_actions = self._valid_actions(state)
