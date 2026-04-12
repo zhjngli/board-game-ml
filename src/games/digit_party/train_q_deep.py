@@ -14,6 +14,7 @@ from keras.models import Model  # type: ignore
 from keras.optimizers import Adam  # type: ignore
 
 from games.digit_party.game import DigitParty, DigitPartyPlacement, DigitPartyState
+from games.digit_party.run_helpers import computer_game
 from games.digit_party.train_deep import DP3NNParams
 from games.game import VALID
 from learners.deep_q import DeepQLearner, DeepQParameters, DQNOutput, EvaluationResult
@@ -34,9 +35,8 @@ DQN_3X3_NN_PARAMS = DP3NNParams(
     output_activation="linear",
 )
 
-TRAINING_EVALUATION_GAMES = 500
-TRAINING_EVALUATION_INTERVAL = 2500
-FINAL_EVALUATION_GAMES = 1000
+MODELS_FOLDER = "deepq_3x3_models"
+ARTIFACTS_FOLDER = "deepq_3x3_artifacts"
 
 
 class DigitPartyEvaluation(NamedTuple):
@@ -196,10 +196,10 @@ def digit_party_evaluation_summary(
 def deep_q_3x3_trained_game():
     cur_dir = pathlib.Path(__file__).parent.resolve()
     nn = DigitParty3x3DeepQNN(
-        params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/deepq_3x3_models/"
+        params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/{MODELS_FOLDER}/"
     )
     target_nn = DigitParty3x3DeepQNN(
-        params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/deepq_3x3_models/"
+        params=DQN_3X3_NN_PARAMS, model_folder=f"{cur_dir}/{MODELS_FOLDER}/"
     )
     nn.summary()
     deepq = DeepQLearner(
@@ -223,13 +223,13 @@ def deep_q_3x3_trained_game():
             episodes_per_model_save=5_000,
             episodes_per_memory_save=5_000,
             episodes_per_stats_print=500,
-            episodes_per_evaluation=TRAINING_EVALUATION_INTERVAL,
+            episodes_per_evaluation=2500,
             state_tracker_size_bits=16_777_216,
             state_tracker_num_hashes=7,
         ),
-        training_artifacts_folder=f"{cur_dir}/deepq_3x3_artifacts/",
+        training_artifacts_folder=f"{cur_dir}/{ARTIFACTS_FOLDER}/",
         evaluator=lambda: digit_party_evaluation_summary(
-            nn=nn, games=TRAINING_EVALUATION_GAMES, n=3
+            nn=nn, games=500, n=3
         ),
     )
     deepq.train()
@@ -237,10 +237,30 @@ def deep_q_3x3_trained_game():
     print(
         "Final evaluation: "
         + digit_party_evaluation_summary(
-            nn=nn, games=FINAL_EVALUATION_GAMES, n=3
+            nn=nn, games=1000, n=3
         ).summary
     )
 
 
+def best_model_game(games: int = 1000) -> None:
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+    model_folder = f"{cur_dir}/{MODELS_FOLDER}"
+    model_file = f"{model_folder}/best_model.weights.h5"
+    if not pathlib.Path(model_file).exists():
+        raise FileNotFoundError(f"Could not find trained best model at {model_file}")
+
+    nn = DigitParty3x3DeepQNN(
+        params=DQN_3X3_NN_PARAMS, model_folder=f"{model_folder}/"
+    )
+    nn.load(model_file)
+    print(f"Loaded best model from: {model_file}")
+    computer_game(
+        DigitParty(n=3),
+        games,
+        lambda state: greedy_digit_party_move(nn, state),
+    )
+
+
 def main() -> None:
-    deep_q_3x3_trained_game()
+    # deep_q_3x3_trained_game()
+    best_model_game(games=1000)
