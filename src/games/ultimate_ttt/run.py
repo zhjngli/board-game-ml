@@ -284,9 +284,6 @@ class UltimateNeuralNetwork(NeuralNetwork):
     def get_weights(self):
         return self.model.get_weights()
 
-    def summary(self) -> None:
-        self.model.summary()
-
 
 training_mcts_params = MCTSParameters(
     num_searches=200,

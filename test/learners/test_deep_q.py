@@ -3,7 +3,7 @@ from typing import List
 
 import numpy as np
 
-from games.game import INVAL, P1, VALID, ActionStatus, BasicState, Game
+from games.game import INVAL, P1, VALID, ActionStatus, BasicState, Game, NNInput
 from learners.deep_q import DeepQLearner, DeepQParameters, DQNOutput, EvaluationResult
 from nn.neural_network import NeuralNetwork
 
@@ -89,8 +89,14 @@ class SingleStepMaskingGame(Game[DummyState, str]):
         return state
 
     @staticmethod
-    def symmetries_of(a: np.ndarray) -> List[np.ndarray]:
-        return [a]
+    def to_nn_input(state: DummyState) -> NNInput:
+        return state.board
+
+    @staticmethod
+    def training_symmetries(
+        nn_input: NNInput, policy: np.ndarray
+    ) -> List[tuple[NNInput, np.ndarray]]:
+        return [(nn_input, policy)]
 
 
 class InPlaceMutationGame(Game[DummyState, str]):
@@ -134,8 +140,14 @@ class InPlaceMutationGame(Game[DummyState, str]):
         return state
 
     @staticmethod
-    def symmetries_of(a: np.ndarray) -> List[np.ndarray]:
-        return [a]
+    def to_nn_input(state: DummyState) -> NNInput:
+        return state.board
+
+    @staticmethod
+    def training_symmetries(
+        nn_input: NNInput, policy: np.ndarray
+    ) -> List[tuple[NNInput, np.ndarray]]:
+        return [(nn_input, policy)]
 
 
 class TwoStepGame(Game[DummyState, str]):
@@ -178,8 +190,14 @@ class TwoStepGame(Game[DummyState, str]):
         return state
 
     @staticmethod
-    def symmetries_of(a: np.ndarray) -> List[np.ndarray]:
-        return [a]
+    def to_nn_input(state: DummyState) -> NNInput:
+        return state.board
+
+    @staticmethod
+    def training_symmetries(
+        nn_input: NNInput, policy: np.ndarray
+    ) -> List[tuple[NNInput, np.ndarray]]:
+        return [(nn_input, policy)]
 
 
 def build_params() -> DeepQParameters:

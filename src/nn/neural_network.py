@@ -25,10 +25,6 @@ class NeuralNetwork(ABC, Generic[Input, Output]):
     def load(self, file: str) -> None:
         pass
 
-    def summary(self) -> None:
-        """Print model architecture summary. Override in subclasses."""
-        pass
-
     @abstractmethod
     def set_weights(self, weights) -> None:
         pass
