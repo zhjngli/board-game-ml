@@ -279,7 +279,6 @@ class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
             optimizer=Adam(learning_rate=self.LEARN_RATE),
             metrics={"pi": ["accuracy", "categorical_crossentropy"], "v": ["mse"]},
         )
-        self.model.summary()
 
     def train(self, data: List[Tuple[A0NNInput, A0NNOutput]]) -> None:
         inputs: List[A0NNInput]
@@ -317,6 +316,9 @@ class UltimateNeuralNetwork(NeuralNetwork[A0NNInput, A0NNOutput]):
 
     def get_weights(self):
         return self.model.get_weights()
+
+    def summary(self) -> None:
+        self.model.summary()
 
 
 def alpha_zero_trained_game():

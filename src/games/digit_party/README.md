@@ -49,3 +49,31 @@ Both agents clearly do better (averaging 70% score) than a totally untrained age
 #### Back to deep Q-learning
 
 The resulting hyperparameters are much more promising, so now I try to use them for the deep q-learning algorithm.
+
+#### Actually making deep Q-learning work
+
+My first deep q-learning attempt still failed, even with better network hyperparameters. I was borrowing too much from the supervised training path and hoping it would transfer cleanly, but it didn't work. The agent was not really training enough, it was wasting too much time around invalid moves, and the whole setup was just not matched well to the actual reinforcement learning problem. I'm a little surprised that adding a mask to avoid invalid moves improves the training so much. In theory it should be possible to punish invalid moves by giving it a negative reward, but I guess it wastes way too much time searching in that space.
+
+With some help from Codex to dig through the failure modes, I reworked the deep q setup instead of just guessing again. The biggest changes were:
+
+1. Invalid actions were masked during training and in the target calculation. This seems to have helped a lot. The network spent less time learning around moves that are not even legal.
+2. Training schedule changes:
+    - Training went from `5000` episodes to `200000` episodes
+    - Replay went from huge and very infrequent updates (`minibatch_size=15041`, `steps_to_train_longterm=15041`) to small and regular updates (`minibatch_size=64`, `steps_to_train_longterm=4`)
+    - Epsilon decay was slowed way down from `0.01` to `0.0001`
+    - Target network syncing became much more frequent. The old setup just was not getting enough useful learning updates.
+3. The network itself got simpler:
+    - `epochs` per update went from `42` to `1`
+    - The deep q network no longer predicts a scalar value representing the score, just the q-values it needs, to avoid training overhead. It may be possible to train the network to predict a scalar value representing the score at each state and still see similar results but I don't think that was necessary at this stage.
+4. Better evaluation, checkpointing, and state tracking were added. That did not directly make the training better, but it made it much easier to see if the run was actually improving and save the best model when it did.
+    - The evaluator runs every `2500` episodes by playing `500` games, which made it a lot easier to tell if training was actually getting better instead of just watching loss values or hoping for the best.
+    - The best evaluation checkpoint is saved automatically, which is how I got the final best model result above.
+    - State tracking uses a Bloom filter to estimate how many unique states the agent has seen without storing every single state exactly. That made it possible to track novelty during training without letting the tracking itself blow up in size.
+
+After that, the result was a lot better. Here is the best 3x3 deep q model playing 1000 games:
+
+![a trained deep q 3x3 agent playing 1000 games scores very high](./results/deepq-3x3-1k-games.png "trained deep q 3x3 agent: games played per percent score")
+
+The best checkpoint from this training run is [best_model_3x3_dqn_200k_run.weights.h5](./deepq_3x3_models/best_model_3x3_dqn_200k_run.weights.h5).
+
+This is the first deep q result for Digit Party that actually feels strong instead of just experimental.
