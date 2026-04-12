@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Hashable
 from typing import Generic, List, Literal, Tuple, TypeVar
 
 from numpy.typing import NDArray
@@ -25,7 +26,7 @@ class BasicState:
 
 State = TypeVar("State", bound=BasicState)
 Action = int
-Immutable = TypeVar("Immutable")  # TODO: enforce hashable/immutable
+Immutable = TypeVar("Immutable", bound=Hashable)
 
 ActionStatus = Literal[1, 0]
 VALID: ActionStatus = 1

@@ -64,7 +64,7 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, DQNOutput]):
         prev = board
 
         # setup conv layers
-        for _ in range(self.params.conv_filters):
+        for _ in range(self.params.conv_layers):
             # normalize along channels axis
             conv = Activation("relu")(
                 BatchNormalization(axis=3)(
@@ -104,7 +104,6 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, DQNOutput]):
             optimizer=Adam(learning_rate=self.params.learning_rate),
             metrics={"pi": ["accuracy", "mse", "mae"], "v": ["accuracy", "mse", "mae"]},
         )
-        self.model.summary()
 
     def train(self, data: List[Tuple[DigitPartyIR, DQNOutput]]) -> None:
         inputs: List[DigitPartyIR]
@@ -119,17 +118,13 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, DQNOutput]):
         )
         target_pis = np.asarray([output.policy for output in outputs])
         target_vs = np.asarray([output.value for output in outputs])
-        print("boards: ", len(input_boards), input_boards)
-        print("currs: ", len(input_currs), input_currs)
-        print("nexts: ", len(input_nexts), input_nexts)
-        print("pis: ", len(target_pis), target_pis)
-        print("vs: ", len(target_vs), target_vs)
         self.model.fit(
             x=[input_boards, input_currs, input_nexts],
             y=[target_pis, target_vs],
             batch_size=self.params.batch_size,
             epochs=self.params.epochs,
             shuffle=True,
+            verbose=0,
         )
 
     def predict(self, inputs: List[DigitPartyIR]) -> List[DQNOutput]:
@@ -161,6 +156,9 @@ class DigitParty3x3NeuralNetwork(NeuralNetwork[DigitPartyIR, DQNOutput]):
 
     def get_weights(self):
         return self.model.get_weights()
+
+    def summary(self) -> None:
+        self.model.summary()
 
 
 orig_nn_params: DP3NNParams = DP3NNParams(

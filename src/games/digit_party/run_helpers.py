@@ -1,5 +1,6 @@
 from typing import Callable
 
+import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
@@ -112,9 +113,11 @@ def computer_game(
     print(f"median: {median:.2f}%")
     print(f"mode: {mode:.2f}%")
 
-    plt.hist(df, bins=50)
+    plt.figure(figsize=(12, 6))
+    bin_edges = np.arange(0, 102, 2)
+    plt.hist(df["percentages"], bins=bin_edges)
     plt.xticks(range(0, 101, 2))
-    plt.locator_params(axis="x", nbins=100)
+    plt.xlim(0, 100)
     plt.title("games played per percent score")
     plt.xlabel("percent score")
     plt.ylabel("number of games")

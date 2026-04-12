@@ -504,6 +504,9 @@ class TTTNeuralNetwork(NeuralNetwork[NNInput, A0NNOutput]):
     def get_weights(self):
         return self.model.get_weights()
 
+    def summary(self) -> None:
+        self.model.summary()
+
 
 orig_nn_params: TTTNNParams = TTTNNParams(
     conv_layers=3,

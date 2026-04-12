@@ -36,3 +36,7 @@ class NeuralNetwork(ABC, Generic[Input, Output]):
     @abstractmethod
     def get_weights(self):
         pass
+
+    @abstractmethod
+    def summary(self) -> None:
+        pass
