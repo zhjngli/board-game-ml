@@ -3,10 +3,9 @@ import time
 from abc import ABC
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Deque, Generic, List, NamedTuple, Optional, Sequence, Tuple
+from typing import Callable, Deque, Generic, List, NamedTuple, Sequence, Tuple
 
 import numpy as np
-from numpy.typing import NDArray
 
 from games.game import P1, P1WIN, P2WIN, Game, Immutable, NNInput, Player, State
 from learners.alpha_zero.artifacts import (
@@ -20,7 +19,7 @@ from learners.alpha_zero.monte_carlo_tree_search import (
     MCTSParameters,
     MonteCarloTreeSearch,
 )
-from learners.alpha_zero.types import A0NNOutput
+from learners.alpha_zero.types import A0NNOutput, Policy
 from nn.neural_network import NeuralNetwork
 
 
@@ -37,6 +36,20 @@ class A0Parameters(NamedTuple):
     eval_mcts_params: MCTSParameters
 
 
+class SelfPlayExample(NamedTuple):
+    nn_input: NNInput
+    player: Player
+    policy: Policy
+
+
+class PitResult(NamedTuple):
+    accepted: bool
+    wins: int
+    losses: int
+    draws: int
+    win_rate: float
+
+
 class AlphaZero(ABC, Generic[State, Immutable]):
     """
     Combines a neural network with Monte Carlo Tree Search to increase training efficiency and reduce memory required for training.
@@ -45,7 +58,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
     def __init__(
         self,
         create_game: Callable[[], Game[State, Immutable]],
-        create_nn: Callable[[], NeuralNetwork],
+        create_nn: Callable[[], NeuralNetwork[NNInput, A0NNOutput]],
         params: A0Parameters,
         training_examples_folder: str,
     ) -> None:
@@ -80,7 +93,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         nn.set_weights(self.nn.get_weights())
         m = MonteCarloTreeSearch(self.create_game(), nn, self.training_mcts_params)
 
-        training_data: List[Tuple[NNInput, Player, NDArray, Optional[float]]] = []
+        training_data: List[SelfPlayExample] = []
         state = game.state()
         player = state.player
 
@@ -94,7 +107,9 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             nn_input = game.to_nn_input(oriented_state)
             syms = game.training_symmetries(nn_input, np.asarray(pi))
             for inp, p in syms:
-                training_data.append((inp, player, p, None))
+                training_data.append(
+                    SelfPlayExample(nn_input=inp, player=player, policy=p)
+                )
 
             action = np.random.choice(len(pi), p=pi)
             state = game.apply(state, action)
@@ -102,8 +117,14 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         reward = game.calculate_reward(state)
         return [
-            (x[0], A0NNOutput(policy=x[2], value=reward * ((-1) ** (x[1] != player))))
-            for x in training_data
+            (
+                example.nn_input,
+                A0NNOutput(
+                    policy=example.policy,
+                    value=reward * ((-1) ** (example.player != player)),
+                ),
+            )
+            for example in training_data
         ]
 
     def train(self) -> None:
@@ -169,9 +190,18 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
             print(f"\nPitting new model vs previous ({self.pit_games} games)...")
             pit_start = time.perf_counter()
-            accepted, wins, losses, draws, win_rate = self.pit()
+            pit_result = self.pit()
             pit_seconds = time.perf_counter() - pit_start
-            pit_history.append((i, accepted, wins, losses, draws, win_rate))
+            pit_history.append(
+                PitHistoryEntry(
+                    episode=i,
+                    accepted=pit_result.accepted,
+                    wins=pit_result.wins,
+                    losses=pit_result.losses,
+                    draws=pit_result.draws,
+                    win_rate=pit_result.win_rate,
+                )
+            )
             print(
                 "Episode timing:"
                 f" self_play={self._format_duration(self_play_seconds)}"
@@ -180,7 +210,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
                 f" | total={self._format_duration(time.perf_counter() - episode_start)}"
             )
 
-            if accepted:
+            if pit_result.accepted:
                 print(f"New model ACCEPTED — saving as ep_{i:07d} and best_model")
                 self.nn.save(f"ep_{i:07d}_model.weights.h5")
                 self.nn.save("best_model.weights.h5")
@@ -216,7 +246,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
         resolved = self.resolve_pending_pit(pending_pit)
         next_pit_history = pit_history + [resolved]
         self.pit_artifact_manager.save_history(next_pit_history)
-        return max(last_ep, resolved[0]), next_pit_history
+        return max(last_ep, resolved.episode), next_pit_history
 
     def _train_current_model(self) -> None:
         while True:
@@ -232,7 +262,7 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             except Exception as e:
                 print(f"Failed to train with error {e}, retrying...")
 
-    def pit(self) -> Tuple[bool, int, int, int, float]:
+    def pit(self) -> PitResult:
         pit_start = time.perf_counter()
         candidate_wins = 0
         previous_wins = 0
@@ -290,26 +320,35 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             f" | time {self._format_duration(pit_seconds)}"
             f" | avg_game {pit_seconds / max(self.pit_games, 1):.2f}s"
         )
-        return accepted, candidate_wins, previous_wins, draws, win_rate
+        return PitResult(
+            accepted=accepted,
+            wins=candidate_wins,
+            losses=previous_wins,
+            draws=draws,
+            win_rate=win_rate,
+        )
 
     @staticmethod
     def _print_pit_summary(pit_history: Sequence[PitHistoryEntry]) -> None:
         def _avg_win_rate(entries: Sequence[PitHistoryEntry]) -> str:
             if not entries:
                 return "n/a"
-            return f"{sum(e[5] for e in entries) / len(entries):.1%}"
+            return f"{sum(entry.win_rate for entry in entries) / len(entries):.1%}"
 
         def _accept_rate(entries: Sequence[PitHistoryEntry]) -> str:
             if not entries:
                 return "n/a"
-            accepted = sum(1 for e in entries if e[1])
+            accepted = sum(1 for entry in entries if entry.accepted)
             return f"{accepted}/{len(entries)}"
 
         recent = list(pit_history[-10:])
         print("\nPit history (last 10):")
-        for ep, accepted, w, l, d, wr in recent:
-            status = "ACCEPTED" if accepted else "rejected"
-            print(f"  ep {ep:>3}: {w}W/{l}L/{d}D {wr:.1%} {status}")
+        for entry in recent:
+            status = "ACCEPTED" if entry.accepted else "rejected"
+            print(
+                f"  ep {entry.episode:>3}: {entry.wins}W/{entry.losses}L/{entry.draws}D"
+                f" {entry.win_rate:.1%} {status}"
+            )
 
         last_5 = pit_history[-5:]
         last_10 = pit_history[-10:]
@@ -342,9 +381,9 @@ class AlphaZero(ABC, Generic[State, Immutable]):
 
         self.pn.load(pending_pit.previous_model_file)
         self.nn.load(pending_pit.candidate_model_file)
-        accepted, wins, losses, draws, win_rate = self.pit()
+        pit_result = self.pit()
 
-        if accepted:
+        if pit_result.accepted:
             print(
                 f"Recovered candidate ACCEPTED — saving as ep_{pending_pit.episode:07d}"
                 " and best_model"
@@ -356,13 +395,13 @@ class AlphaZero(ABC, Generic[State, Immutable]):
             self.nn.load(pending_pit.previous_model_file)
 
         self.pit_artifact_manager.clear_pending(self.nn.model_folder)
-        return (
-            pending_pit.episode,
-            accepted,
-            wins,
-            losses,
-            draws,
-            win_rate,
+        return PitHistoryEntry(
+            episode=pending_pit.episode,
+            accepted=pit_result.accepted,
+            wins=pit_result.wins,
+            losses=pit_result.losses,
+            draws=pit_result.draws,
+            win_rate=pit_result.win_rate,
         )
 
     def load_latest_model(self) -> int:

@@ -6,7 +6,16 @@ from typing import Iterable, List, NamedTuple, Optional, Sequence, Tuple
 from games.game import NNInput
 from learners.alpha_zero.types import A0NNOutput
 
-PitHistoryEntry = Tuple[int, bool, int, int, int, float]
+
+class PitHistoryEntry(NamedTuple):
+    episode: int
+    accepted: bool
+    wins: int
+    losses: int
+    draws: int
+    win_rate: float
+
+
 TrainingExamples = List[Tuple[NNInput, A0NNOutput]]
 
 
@@ -218,7 +227,11 @@ class AlphaZeroPitArtifactManager:
             return []
 
         with open(self.pit_history_file(), "rb") as file:
-            return pickle.load(file)
+            raw_history = pickle.load(file)
+        return [
+            entry if isinstance(entry, PitHistoryEntry) else PitHistoryEntry(*entry)
+            for entry in raw_history
+        ]
 
     def save_history(self, pit_history: Sequence[PitHistoryEntry]) -> None:
         self.ensure_folder()

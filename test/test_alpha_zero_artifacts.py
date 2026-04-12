@@ -7,6 +7,7 @@ from learners.alpha_zero.artifacts import (
     AlphaZeroPitArtifactManager,
     AlphaZeroTrainingHistoryManager,
     PendingPitState,
+    PitHistoryEntry,
 )
 from learners.alpha_zero.types import A0NNOutput
 
@@ -47,7 +48,13 @@ def test_pit_artifact_manager_persists_and_clears_pending(tmp_path: Path):
     manager = AlphaZeroPitArtifactManager(str(artifact_folder))
     pending = manager.build_pending_state(5)
     manager.save_pending(pending)
-    manager.save_history([(5, True, 3, 1, 0, 0.75)])
+    manager.save_history(
+        [
+            PitHistoryEntry(
+                episode=5, accepted=True, wins=3, losses=1, draws=0, win_rate=0.75
+            )
+        ]
+    )
 
     for model_file in (pending.previous_model_file, pending.candidate_model_file):
         (model_folder / model_file).write_text("weights")
@@ -58,7 +65,11 @@ def test_pit_artifact_manager_persists_and_clears_pending(tmp_path: Path):
         candidate_model_file=pending.candidate_model_file,
     )
     assert manager.pending_models_exist(str(model_folder), pending)
-    assert manager.load_history() == [(5, True, 3, 1, 0, 0.75)]
+    assert manager.load_history() == [
+        PitHistoryEntry(
+            episode=5, accepted=True, wins=3, losses=1, draws=0, win_rate=0.75
+        )
+    ]
 
     manager.clear_pending(str(model_folder))
     assert manager.load_pending() is None

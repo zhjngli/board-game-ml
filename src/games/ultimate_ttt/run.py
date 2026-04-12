@@ -164,7 +164,7 @@ MCP1_POLICY = "src/games/ultimate_ttt/mcp1.pkl"
 MCP2_POLICY = "src/games/ultimate_ttt/mcp2.pkl"
 
 
-def monte_carlo_trained_game():
+def monte_carlo_trained_game() -> None:
     computer1 = UltimateMonteCarloLearner(policy_file=MCP1_POLICY)
     computer2 = UltimateMonteCarloLearner(policy_file=MCP2_POLICY)
     g = UltimateMonteCarloTrainer(p1=computer1, p2=computer2)
@@ -191,7 +191,7 @@ def monte_carlo_trained_game():
     print("\ngame over!")
 
 
-class UltimateNeuralNetwork(NeuralNetwork):
+class UltimateNeuralNetwork(NeuralNetwork[NNInput, A0NNOutput]):
     NUM_FILTERS = 64
     NUM_CONV_LAYERS = 4
     DROPOUT_RATE = 0.05
@@ -302,7 +302,7 @@ eval_mcts_params = MCTSParameters(
 )
 
 
-def alpha_zero_train():
+def alpha_zero_train() -> None:
     cur_dir = pathlib.Path(__file__).parent.resolve()
     a0 = AlphaZero(
         UltimateTicTacToe,
@@ -355,7 +355,7 @@ def self_play_demo(model: str = "best_model.weights.h5") -> None:
         print("\nDraw!")
 
 
-def vs_alpha_zero_game():
+def vs_alpha_zero_game() -> None:
     cur_dir = pathlib.Path(__file__).parent.resolve()
     g = UltimateTicTacToe()
     nn = UltimateNeuralNetwork(model_folder=f"{cur_dir}/a0_nn_models/")

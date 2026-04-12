@@ -5,7 +5,8 @@ from typing import Dict, Generic, List, NamedTuple, Set, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from games.game import Action, ActionStatus, Game, Immutable, State
+from games.game import Action, ActionStatus, Game, Immutable, NNInput, State
+from learners.alpha_zero.types import A0NNOutput
 from nn.neural_network import NeuralNetwork
 
 
@@ -21,7 +22,7 @@ class MonteCarloTreeSearch(ABC, Generic[State, Immutable]):
     def __init__(
         self,
         game: Game[State, Immutable],
-        nn: NeuralNetwork,
+        nn: NeuralNetwork[NNInput, A0NNOutput],
         params: MCTSParameters,
     ) -> None:
         # q values for state-action pair
