@@ -68,6 +68,10 @@ class DigitParty3x3DeepQNN(NeuralNetwork[DigitPartyState, DQNOutput]):
             )(prev)
 
         flat = Flatten()(prev)
+        # TODO(digit-party-5x5): try broadcasting current/next digits as extra
+        # 2D planes before the conv stack instead of appending them here as
+        # scalars. That would let spatial filters condition on digit context
+        # earlier in the network.
         prev = Concatenate()([flat, input_curr_digit, input_next_digit])
 
         for _ in range(self.params.dense_layers):
