@@ -49,7 +49,33 @@ def _define_parser() -> argparse.ArgumentParser:
         aliases=["dpdq", "dp_deep_q"],
         help="run digit party with deep q learning",
     )
-    sub_digit_party_deep_q.set_defaults(function=digit_party_deep_q.main)
+    sub_digit_party_deep_q.add_argument(
+        "--size",
+        choices=["3", "5"],
+        default="3",
+        help="digit party board size to run",
+    )
+    sub_digit_party_deep_q.add_argument(
+        "--mode",
+        choices=["train", "eval-best"],
+        default="eval-best",
+        help="train agent or evaluate best saved model",
+    )
+    sub_digit_party_deep_q.add_argument(
+        "--games",
+        type=int,
+        default=1000,
+        help="number of evaluation games to run",
+    )
+    sub_digit_party_deep_q.add_argument(
+        "--episodes",
+        type=int,
+        default=None,
+        help="optional training episode override",
+    )
+    sub_digit_party_deep_q.set_defaults(
+        function=digit_party_deep_q.main, pass_args=True
+    )
 
     return parser
 
@@ -57,4 +83,7 @@ def _define_parser() -> argparse.ArgumentParser:
 def run() -> None:
     parser = _define_parser()
     args = parser.parse_args()
-    args.function()
+    if getattr(args, "pass_args", False):
+        args.function(args)
+    else:
+        args.function()
